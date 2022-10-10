@@ -58,4 +58,4 @@ python FED.py
 
 ### Guide
 
-View the [guide](How_to_use_FED_code.pdf) about how to analyse your FED data.
+View the [guide about how to analyse your FED data](How_to_use_FED_code.pdf).
