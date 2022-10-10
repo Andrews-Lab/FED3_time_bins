@@ -9,7 +9,7 @@ Each python code also has an easy-to-use graphical user interface.
 
 ![image](https://user-images.githubusercontent.com/101311642/194792955-85f67a03-a02d-47e2-9e02-c9aa5242e874.png)
 
-![image](https://user-images.githubusercontent.com/101311642/194793474-ff3d9bc6-37e4-48b5-b5ef-cf553014d3ed.png)
+![image](https://user-images.githubusercontent.com/101311642/194794142-86fe0e84-cf50-43bf-b4fb-14759214238c.png)
 
 ### Installation
 
