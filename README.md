@@ -2,6 +2,10 @@
 
 ### Overview
 
+FED3 or Feeding Experimentation Device Version 3 is a home cage feeding device, developed by the Kravitz Lab.
+https://hackaday.io/project/106885-feeding-experimentation-device-3-fed3
+https://kravitzlab.com/
+
 The CSV output from the FED3 devices show the timestamps of each event, like nose pokes or pellet retrievals. This repository :
 * Converts this output into a time binned file. It also adds another sheet with the time stamps of all pellet count changes.
 * Creates a master file that combines all the “Left poke count” columns from the raw FED files into one sheet. It does the same thing for the other column types as well. The columns are then sorted by genotype and treatment. <br>
