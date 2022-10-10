@@ -27,7 +27,7 @@ Install [Anaconda Navigator](https://www.anaconda.com/products/distribution). <b
 Open Anaconda Prompt (on Mac open terminal and install X-Code when prompted). <br>
 Download this repository to your home directory by typing in the line below.
 ```
-git clone https://github.com/H-Dempsey/FED3_time_bins.git
+git clone https://github.com/Andrews-Lab/FED3_time_bins.git
 ```
 Change the directory to the place where the downloaded folder is. <br>
 ```
