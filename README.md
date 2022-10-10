@@ -59,3 +59,18 @@ python FED.py
 ### Guide
 
 View the guide about [how to analyse your FED data](How_to_use_FED_code.pdf).
+
+### Acknowledgements
+
+Author:
+Harry Dempsey
+Andrews lab and Foldi lab
+https://github.com/H-Dempsey
+
+Credits:
+Zane Andrews, Wang Lok So, Lex Kravitz
+
+About the labs:
+The [Andrews lab](https://www.monash.edu/discovery-institute/andrews-lab) investigates how the brain senses and responds to hunger.
+The [Foldi lab](https://www.monash.edu/discovery-institute/foldi-lab) investigates the biological underpinnings of anorexia nervosa and feeding disorders.
+The [Kravitz lab](https://kravitzlab.com/) investigates the function of basal ganglia circuits and how they change in diseases such as obesity, addiction, and depression.
