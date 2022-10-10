@@ -7,7 +7,9 @@ https://www.monash.edu/discovery-institute/foldi-lab
 
 Each python code also has an easy-to-use graphical user interface.
 
-![image](https://user-images.githubusercontent.com/101311642/161454651-e48dec94-bdef-43a8-979c-bc1dbb9f827b.png)
+![image](https://user-images.githubusercontent.com/101311642/194792955-85f67a03-a02d-47e2-9e02-c9aa5242e874.png)
+
+![image](https://user-images.githubusercontent.com/101311642/194793474-ff3d9bc6-37e4-48b5-b5ef-cf553014d3ed.png)
 
 ### Installation
 
@@ -51,8 +53,4 @@ Follow the instructions in the "Guide to these codes" folder.
 
 Here is a brief overview of the raw data each python code takes, and the outputs they make.
 
-![image](https://user-images.githubusercontent.com/101311642/161454850-fadcbab8-23db-4d04-abf2-fb16b424b9dd.png)
 
-![image](https://user-images.githubusercontent.com/101311642/161454859-3d0994e9-7039-482e-a576-a4e6ff8a943f.png)
-
-![image](https://user-images.githubusercontent.com/101311642/182097493-7088d3b4-5090-4ced-8e0b-63516bf4e2a6.png)
