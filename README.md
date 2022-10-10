@@ -43,9 +43,6 @@ Choose the code to run by entering one of these lines.
 python FED.py
 ```
 
-Alternatively, you can run these codes using a python IDE called "Spyder".
-Follow the instructions in the "Guide to these codes" folder.
-
 ### Guide
 
 See the How_to_use_FED_code.pdf guide in this repository.
