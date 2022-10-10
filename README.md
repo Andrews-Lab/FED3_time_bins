@@ -1,6 +1,6 @@
 # FED3 Time Bin Analysis
 
-__Purpose__
+### Overview
 
 The CSV output from the FED3 devices show the timestamps of each event, like nose pokes or pellet retrievals. This repository :
 * Converts this output into a time binned file. It also adds another sheet with the time stamps of all pellet count changes.
