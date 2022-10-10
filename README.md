@@ -4,7 +4,11 @@ The CSV output from the FED3 devices show the timestamps of each event, like nos
 * Converts this output into a time binned file. It also adds another sheet with the time stamps of all pellet count changes.
 * Creates a master file that combines all the “Left poke count” columns from the raw FED files into one sheet. It does the same thing for the other column types as well. The columns are then sorted by genotype and treatment. <br>
 
+These codes have easy-to-use GUIs.
+
 ![image](https://user-images.githubusercontent.com/101311642/194792955-85f67a03-a02d-47e2-9e02-c9aa5242e874.png)
+
+These codes create time binned data for each FED3 file and a master file for all results.
 
 ![image](https://user-images.githubusercontent.com/101311642/194794376-e8ae77ac-dbc8-41dc-a1c8-bf0b7ace3f52.png)
 
@@ -50,7 +54,7 @@ Follow the instructions in the "Guide to these codes" folder.
 
 1.	Select all the options for time bins analysis and click “submit”. Here is an explanation of all the options:
 
-![image](https://user-images.githubusercontent.com/101311642/194795486-d17b9044-1810-40e2-996f-ded874208182.png)
+<img src="https://user-images.githubusercontent.com/101311642/194795486-d17b9044-1810-40e2-996f-ded874208182.png" alt="drawing" width="500"/>
 
 * __Import location__: the import location is a folder that contains the raw FEDs data. The code will analyse each CSV file in the folder.
 * __Export location__: the export location is a folder for the time binned files.
@@ -86,5 +90,5 @@ __Pellet count changes sheet__
 
 4. The option “get individual columns summaries” at the start of the GUI can also be used to create a master excel file, that combines the columns from all excel files. Note that the raw FED files should still be imported, not the time binned files.
 
-![image](https://user-images.githubusercontent.com/101311642/194796276-162dd303-556c-4e43-bef8-c42922bc4e45.png)
+<img src="https://user-images.githubusercontent.com/101311642/194796276-162dd303-556c-4e43-bef8-c42922bc4e45.png" alt="drawing" width="500"/>
 
