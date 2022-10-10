@@ -1,10 +1,16 @@
 # FED3 Time Bin Analysis
 
+__Purpose__
+
 The CSV output from the FED3 devices show the timestamps of each event, like nose pokes or pellet retrievals. This repository :
 * Converts this output into a time binned file. It also adds another sheet with the time stamps of all pellet count changes.
 * Creates a master file that combines all the “Left poke count” columns from the raw FED files into one sheet. It does the same thing for the other column types as well. The columns are then sorted by genotype and treatment. <br>
 
+__Preview of the graphical user interfaces__
+
 ![image](https://user-images.githubusercontent.com/101311642/194792955-85f67a03-a02d-47e2-9e02-c9aa5242e874.png)
+
+__Input and output data__
 
 ![image](https://user-images.githubusercontent.com/101311642/194794376-e8ae77ac-dbc8-41dc-a1c8-bf0b7ace3f52.png)
 
