@@ -1,4 +1,4 @@
-# FED3 Time Bin Analysis
+# FED3 Time Bin Analysis 🐁
 
 ### Overview
 
