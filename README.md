@@ -2,9 +2,12 @@
 
 ### Overview
 
-FED3 or Feeding Experimentation Device Version 3 is a home cage feeding device, developed by the Kravitz Lab.
-https://hackaday.io/project/106885-feeding-experimentation-device-3-fed3
-https://kravitzlab.com/
+__FED3__
+
+FED3 or Feeding Experimentation Device Version 3 is a [home cage feeding device](https://github.com/KravitzLabDevices/FED3), developed by the [Kravitz Lab](https://kravitzlab.com/). <br>
+It is open source and is used for the training of mice in operant tasks. <br>
+
+__Purpose__
 
 The CSV output from the FED3 devices show the timestamps of each event, like nose pokes or pellet retrievals. This repository :
 * Converts this output into a time binned file. It also adds another sheet with the time stamps of all pellet count changes.
@@ -20,7 +23,7 @@ __Input and output data__
 
 ### Installation
 
-Install Anaconda Navigator (https://www.anaconda.com/products/distribution). <br>
+Install [Anaconda Navigator](https://www.anaconda.com/products/distribution). <br>
 Open Anaconda Prompt (on Mac open terminal and install X-Code when prompted). <br>
 Download this repository to your home directory by typing in the line below.
 ```
