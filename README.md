@@ -15,7 +15,7 @@ The CSV output from the FED3 devices show the timestamps of each event, like nos
 
 __Preview of the graphical user interfaces__
 
-![image](https://user-images.githubusercontent.com/101311642/194792955-85f67a03-a02d-47e2-9e02-c9aa5242e874.png)
+![image](https://user-images.githubusercontent.com/101311642/195033127-046fec78-24ae-4ab7-b059-f763a19e93b4.png)
 
 __Input and output data__
 
