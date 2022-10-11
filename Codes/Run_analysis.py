@@ -26,4 +26,3 @@ for inputs['Filename'] in tqdm(import_files, ncols=70):
 # Create the master master file.
 if inputs['Find individual columns'] == True:
     create_master_file(master, inputs)
-            

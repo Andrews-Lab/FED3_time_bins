@@ -12,17 +12,14 @@ def default_values():
     default = {}
 
     # Choose the path of a folder, so the code can import every CSV file in the folder.
-    # Do not include a slash at the end.
     default['Import location'] = r'C:/Users/hazza/Desktop/Import folder'
     default['Export location'] = r'C:/Users/hazza/Desktop/Export folder'
     
-    # If an ACTIVE initiation poke is made, use that for the start time.
-    # The end time is then the last time point in the raw excel file.
-    default['Use initiation poke'] = True
-    
-    # If there is no initiation poke, set the start and end times manually.
-    default['Start time'] = '2/07/2022 19:31:12'
-    default['End time']   = '2/07/2022 21:48:57'
+    # Choose the start and end times.
+    default['Type start time'] = 'Use custom time'
+    default['Start time']      = '2/07/2022 19:31:12'
+    default['Type end time']   = 'Use custom time'
+    default['End time']        = '2/07/2022 21:48:57'
     
     # Choose the interval for the time bins.
     default['Time bin (mins)'] = 1
@@ -48,20 +45,25 @@ def basic_options(default):
         [sg.T("")], [sg.Text("Choose a folder for the export location"),
                      sg.Input(default_text=default['Export location'],key="Export",
                               enable_events=True),sg.FolderBrowse(key="Export2")],
-        [sg.T("")], [sg.Text("Use an active initiation poke to start recording until "
-                             "the last time point (ignore start and end times)"),
-                     sg.Combo(["True", "False"],default_value=str(default['Use initiation poke']),
-                              key="Initiation_Poke",enable_events=True)],
-        [sg.T("")], [sg.Text("Start time",size=(20,1)), 
-                     sg.Input(default_text=default['Start time'],key="Start_Time",enable_events=True)],
-        [sg.T("")], [sg.Text("End time",size=(20,1)), 
-                     sg.Input(default_text=default['End time'],key="End_Time",enable_events=True)],
+        [sg.T("")], [sg.Text("Start time",size=(8,1)), 
+                     sg.Combo(["Use custom time","Use first timestamp","Use initiation poke"],
+                              default_value=default['Type start time'], size=(17,1),
+                              key="Type_Start_Time",enable_events=True),
+                     sg.Input(default_text=default['Start time'],key="Start_Time",
+                              enable_events=True, size=(25,1))],
+        [sg.T("")], [sg.Text("End time",size=(8,1)), 
+                     sg.Combo(["Use custom time","Use last timestamp"],
+                              default_value=default['Type end time'], size=(17,1),
+                              key="Type_End_Time",enable_events=True),
+                     sg.Input(default_text=default['End time'],key="End_Time",
+                              enable_events=True, size=(25,1))],
         [sg.T("")], [sg.Text("Time bin interval (in mins)",size=(20,1)), 
                      sg.Input(default_text=default['Time bin (mins)'],key="Time_Bin",
                               enable_events=True,size=(10,1))],
         [sg.T("")], [sg.Text("Get individual column summaries and label " +
                              "genotypes/treatments",size=(48,1)), 
-                     sg.Combo(["True", "False"],default_value=str(default['Find individual columns']),
+                     sg.Combo(["True", "False"],
+                              default_value=str(default['Find individual columns']),
                               key="Find_Ind_Cols",enable_events=True)],
         [sg.T("")], [sg.Button("Submit")]
              ]
@@ -72,11 +74,22 @@ def basic_options(default):
         if event == sg.WIN_CLOSED or event=="Exit":
             window.close()
             sys.exit()
-        elif event == "Submit":
+        # Make the time entries invisible if needed.
+        if values["Type_Start_Time"] in ["Use first timestamp","Use initiation poke"]:
+            window.Element("Start_Time").Update(visible=False)
+        if values["Type_Start_Time"] == 'Use custom time':
+            window.Element("Start_Time").Update(visible=True)
+        if values["Type_End_Time"] == "Use last timestamp":
+            window.Element("End_Time").Update(visible=False)
+        if values["Type_End_Time"] == 'Use custom time':
+            window.Element("End_Time").Update(visible=True)
+        # If submit is pressed, record the entries in the GUI.
+        if event == "Submit":
             inputs['Import location']         = values["Import"]
             inputs['Export location']         = values["Export"]
-            inputs['Use initiation poke']     = str_to_bool(values["Initiation_Poke"])
+            inputs['Start time type']         = values["Type_Start_Time"]
             inputs['Start time']              = values["Start_Time"]
+            inputs['End time type']           = values["Type_End_Time"]
             inputs['End time']                = values["End_Time"]
             inputs['Time bin (mins)']         = float(values["Time_Bin"])
             inputs['Find individual columns'] = str_to_bool(values["Find_Ind_Cols"])

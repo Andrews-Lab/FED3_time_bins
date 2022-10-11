@@ -93,30 +93,39 @@ def combine_time_columns(df):
     return(df)
 
 def edit_start_and_end_times(df, inputs):
-    
-    # Find the start and end times if there is an ACTIVE initiation poke.                    
-    if inputs['Use initiation poke'] == True:
-        for i in range(len(df)):
-            active_poke_col = df.at[i,"Active Poke"] + " Poke Count"
-            if df.at[i,active_poke_col] >= 1:
-                inputs['Start time'] = df.at[i,"Time"]
-                inputs['End time']   = df.at[len(df)-1,"Time"]
-                break             
-    elif inputs['Use initiation poke'] == False:
-        inputs['Start time'] = pd.to_datetime(inputs['Start time'])
-        inputs['End time']   = pd.to_datetime(inputs['End time'])
+        
+    # Find the start and end times, if use initiation poke or use first/last 
+    # timestamps is selected.          
+    for time in ['Start time', 'End time']:
+        
+        if inputs[time+' type'] == 'Use custom time':
+            inputs[time] = pd.to_datetime(inputs[time])
+        
+        if time == 'Start time':
+            if inputs[time+' type'] == 'Use first timestamp':
+                inputs[time] = df.at[0,"Time"]
+        
+            if inputs[time+' type'] == 'Use initiation poke':
+                for i in range(len(df)):
+                    active_poke_col = df.at[i,"Active Poke"] + " Poke Count"
+                    if df.at[i,active_poke_col] >= 1:
+                        inputs[time] = df.at[i,"Time"]
+                        break
+                    
+        if time == 'End time':
+            if inputs[time+' type'] == 'Use last timestamp':
+                inputs[time] = df.at[len(df)-1,"Time"]
         
     # If the end time is before the first data point or the start time is after 
     # the last data point, throw an error.
     if inputs['End time'] < df.at[0,"Time"]:
         print('\nThe end time is before the first data point in file '+inputs['Filename']+'.')
-        print('Change the end time or set "use an active initiation poke" to '+
-              'true in the GUI.')
+        print('Change the custom end time or select "Use last end time".')
         sys.exit()
     elif inputs['Start time'] > df.at[len(df)-1,"Time"]:
         print('\nThe start time is after the last data point in file '+inputs['Filename']+'.')
-        print('Change the start time or set "use an active initiation poke" to '+
-              'true in the GUI.')
+        print('Change the custom start time, select "Use first timestamp" or '+
+              'select "Use initiation poke".')
         sys.exit()
         
     return(inputs)
