@@ -51,7 +51,7 @@ Activate the conda environment.
 conda activate FTB
 ```
 
-Choose the code to run by entering one of these lines.
+Run the codes.
 ```
 python FED.py
 ```
