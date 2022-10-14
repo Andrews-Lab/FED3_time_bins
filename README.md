@@ -29,6 +29,10 @@ Download this repository to your home directory by typing in the line below.
 ```
 git clone https://github.com/Andrews-Lab/FED3_time_bins.git
 ```
+If you receive an error about git, install git using the line below, type "Y" when prompted and then re-run the line above.
+```
+conda install -c anaconda git
+```
 Change the directory to the place where the downloaded folder is. <br>
 ```
 cd FED3_time_bins
