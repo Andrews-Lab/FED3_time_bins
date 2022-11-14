@@ -16,10 +16,10 @@ def default_values():
     default['Export location'] = r'C:/Users/hazza/Desktop/Export folder'
     
     # Choose the start and end times.
-    default['Type start time'] = 'Use custom time'
-    default['Start time']      = '2/07/2022 19:31:12'
-    default['Type end time']   = 'Use custom time'
-    default['End time']        = '2/07/2022 21:48:57'
+    default['Type start time']  = 'Use custom time'
+    default['Start time']       = '2/07/2022 19:31:12'
+    default['Type end time']    = 'Use custom time'
+    default['End time']         = '2/07/2022 21:48:57'
     
     # Choose the interval for the time bins.
     default['Time bin (mins)'] = 1

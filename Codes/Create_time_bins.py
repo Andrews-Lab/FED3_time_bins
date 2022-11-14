@@ -93,12 +93,24 @@ def combine_time_columns(df):
     return(df)
 
 def edit_start_and_end_times(df, inputs):
-        
+    
     # Find the start and end times, if use initiation poke or use first/last 
     # timestamps is selected.          
     for time in ['Start time', 'End time']:
         
         if inputs[time+' type'] == 'Use custom time':
+            # Find a way to identify when there is only a time listed and no date.
+            # This is tricky and I may update this in the future.
+            # If a date isn't included, use the most common date from the FED file.
+            date_time_components = str(inputs[time]).split(' ')
+            date_time_components = [val for val in date_time_components if val!='']
+            if len(date_time_components) == 1:
+                def find_date(time):
+                    return(time.date())
+                most_common_date = df["Time"].apply(find_date).mode()[0]
+                inputs[time] = str(most_common_date)+' '+inputs[time]
+            
+            # Convert the string to a datetime object.
             inputs[time] = pd.to_datetime(inputs[time])
         
         if time == 'Start time':
