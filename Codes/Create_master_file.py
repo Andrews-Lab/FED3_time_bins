@@ -5,7 +5,10 @@ def create_blank_master():
     
     sheet_names = ['Date','Time','Time bins (mins)','Session Type','FR','Left Poke Count',
                    'Right Poke Count','Pellet Count','Block Pellet Count','Retrieval Time',
-                   'Interpellet Interval','Poke Time']
+                   'Interpellet Interval','Poke Time','>Left_Regular_trial',
+                   '>Left_Stop_trial','LeftinTimeOut','NoPoke_Regular_(incorrect)',
+                   'NoPoke_STOP_(correct)','Pellet','Right_no_left','Right_Regular_(correct)',
+                   'RightDuringDispense','RightinTimeout']
     master = {}
     for col in sheet_names:
         master[col] = pd.DataFrame()
@@ -15,7 +18,10 @@ def add_columns_to_master(master, df_bins, inputs):
     
     sheet_names = ['Date','Time','Time bins (mins)','Session Type','FR','Left Poke Count',
                    'Right Poke Count','Pellet Count','Block Pellet Count','Retrieval Time',
-                   'Interpellet Interval','Poke Time']
+                   'Interpellet Interval','Poke Time','>Left_Regular_trial',
+                   '>Left_Stop_trial','LeftinTimeOut','NoPoke_Regular_(incorrect)',
+                   'NoPoke_STOP_(correct)','Pellet','Right_no_left','Right_Regular_(correct)',
+                   'RightDuringDispense','RightinTimeout']
     sheet_cols = [col for col in sheet_names if col in df_bins.columns]
     for col in sheet_cols:
         master[col][inputs['Filename']] = df_bins[col]
