@@ -1,0 +1,10 @@
+Import location: C:/Users/harry/Downloads/FED_files_151124/Raw
+Export location: C:/Users/harry/Downloads/FED_files_151124/Raw
+Start time type: Use first timestamp
+Start time: 2/07/2022 19:31:12
+End time type: Use last timestamp
+End time: 2/07/2022 21:48:57
+Time bin (mins): 1.0
+Find individual columns: true
+Use settings file: true
+Settings import location: C:/Users/harry/Downloads/FED_files_151124/Raw/Settings_excel_file0.xlsx

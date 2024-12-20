@@ -2,34 +2,19 @@ import pandas as pd
 import os
 import PySimpleGUI as sg
 import sys
+import yaml
+
+def import_yaml_file():
+    # Load the yaml file with the default values.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    yaml_file = os.path.join(script_dir, "GUI_default_values.yaml")
+    with open(yaml_file, "r") as file:
+        default = yaml.safe_load(file)
+    return(default)
 
 def str_to_bool(value):
     dict1 = {'True':True, 'False':False}
     return(dict1[value])
-
-def default_values():
-    
-    default = {}
-
-    # Choose the path of a folder, so the code can import every CSV file in the folder.
-    default['Import location'] = r'C:/Users/hazza/Desktop/Import folder'
-    default['Export location'] = r'C:/Users/hazza/Desktop/Export folder'
-    
-    # Choose the start and end times.
-    default['Type start time']  = 'Use custom time'
-    default['Start time']       = '2/07/2022 19:31:12'
-    default['Type end time']    = 'Use custom time'
-    default['End time']         = '2/07/2022 21:48:57'
-    
-    # Choose the interval for the time bins.
-    default['Time bin (mins)'] = 1
-    
-    # Choose whether to analyse individual columns and select genotypes/treatments.
-    # Choose whether to import an existing settings file.
-    default['Find individual columns']    = False
-    default['Use settings file']          = False
-    
-    return(default)
 
 def basic_options(default):
     
@@ -47,14 +32,14 @@ def basic_options(default):
                               enable_events=True),sg.FolderBrowse(key="Export2")],
         [sg.T("")], [sg.Text("Start time",size=(8,1)), 
                      sg.Combo(["Use custom time","Use first timestamp","Use initiation poke"],
-                              default_value=default['Type start time'], size=(17,1),
-                              key="Type_Start_Time",enable_events=True),
+                              default_value=default['Start time type'], size=(17,1),
+                              key="Start_Time_Type",enable_events=True),
                      sg.Input(default_text=default['Start time'],key="Start_Time",
                               enable_events=True, size=(25,1))],
         [sg.T("")], [sg.Text("End time",size=(8,1)), 
                      sg.Combo(["Use custom time","Use last timestamp"],
-                              default_value=default['Type end time'], size=(17,1),
-                              key="Type_End_Time",enable_events=True),
+                              default_value=default['End time type'], size=(17,1),
+                              key="End_Time_Type",enable_events=True),
                      sg.Input(default_text=default['End time'],key="End_Time",
                               enable_events=True, size=(25,1))],
         [sg.T("")], [sg.Text("Time bin interval (in mins)",size=(20,1)), 
@@ -67,29 +52,39 @@ def basic_options(default):
                               key="Find_Ind_Cols",enable_events=True)],
         [sg.T("")], [sg.Button("Submit")]
              ]
-    window = sg.Window('Options for analysis', layout)
-        
+    window = sg.Window('Options for analysis', layout, finalize=True)
+    
+    # Intialise the prompt visibility.
+    if default["Start time type"] in ["Use first timestamp","Use initiation poke"]:
+        window.Element("Start_Time").Update(visible=False)
+    if default["Start time type"] == 'Use custom time':
+        window.Element("Start_Time").Update(visible=True)
+    if default["End time type"] == "Use last timestamp":
+        window.Element("End_Time").Update(visible=False)
+    if default["End time type"] == 'Use custom time':
+        window.Element("End_Time").Update(visible=True)
+    
     while True:
         event, values = window.read()
         if event == sg.WIN_CLOSED or event=="Exit":
             window.close()
             sys.exit()
         # Make the time entries invisible if needed.
-        if values["Type_Start_Time"] in ["Use first timestamp","Use initiation poke"]:
+        if values["Start_Time_Type"] in ["Use first timestamp","Use initiation poke"]:
             window.Element("Start_Time").Update(visible=False)
-        if values["Type_Start_Time"] == 'Use custom time':
+        if values["Start_Time_Type"] == 'Use custom time':
             window.Element("Start_Time").Update(visible=True)
-        if values["Type_End_Time"] == "Use last timestamp":
+        if values["End_Time_Type"] == "Use last timestamp":
             window.Element("End_Time").Update(visible=False)
-        if values["Type_End_Time"] == 'Use custom time':
+        if values["End_Time_Type"] == 'Use custom time':
             window.Element("End_Time").Update(visible=True)
         # If submit is pressed, record the entries in the GUI.
         if event == "Submit":
             inputs['Import location']         = values["Import"]
             inputs['Export location']         = values["Export"]
-            inputs['Start time type']         = values["Type_Start_Time"]
+            inputs['Start time type']         = values["Start_Time_Type"]
             inputs['Start time']              = values["Start_Time"]
-            inputs['End time type']           = values["Type_End_Time"]
+            inputs['End time type']           = values["End_Time_Type"]
             inputs['End time']                = values["End_Time"]
             inputs['Time bin (mins)']         = float(values["Time_Bin"])
             inputs['Find individual columns'] = str_to_bool(values["Find_Ind_Cols"])
@@ -121,12 +116,12 @@ def import_settings_file(inputs, default):
     
     return(inputs)    
     
-def choose_settings_file_location(inputs):
+def choose_settings_file_location(inputs, default):
     
     sg.theme("DarkTeal2")
     layout = [
         [sg.T("")], [sg.Text("Choose the location of the settings excel file."), 
-                     sg.Input(default_text=inputs['Import location'],key="Import",
+                     sg.Input(default_text=default['Settings import location'],key="Import",
                               enable_events=True),sg.FileBrowse(key="Import2")],
         [sg.T("")], [sg.Button("Submit")]
              ]
@@ -142,6 +137,7 @@ def choose_settings_file_location(inputs):
             break
     gt_table = pd.read_excel(file_path, index_col=0)
     gt_table = gt_table.fillna('')
+    inputs['Settings import location'] = file_path
     inputs['Genotypes/treatments table'] = gt_table
     
     return(inputs)
@@ -193,9 +189,29 @@ def export_settings_file(inputs):
     inputs['Genotypes/treatments table'].to_excel(export_destination)
     print('Saved ' + export_name + ' at ' + inputs['Export location'] + '\n')
     
+def export_yaml_file(inputs, default):
+    
+    export = {}
+    entries = ['Import location','Export location','Start time type','Start time',
+               'End time type','End time','Time bin (mins)','Find individual columns',
+               'Use settings file','Settings import location']
+    for entry in entries:
+        if entry in inputs.keys():
+            export[entry] = inputs[entry]
+        elif entry in default.keys():
+            export[entry] = default[entry]
+        else:
+            export[entry] = ''
+    
+    # Export the default values and replace the old yaml file.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    yaml_file = os.path.join(script_dir, "GUI_default_values.yaml")
+    with open(yaml_file, "w") as file:
+        yaml.dump(export, file, sort_keys=False, default_flow_style=False)
+    
 def GUI():
     
-    default = default_values()
+    default = import_yaml_file()
     inputs = basic_options(default)
     
     # If find individual columns is true, ask whether to import an existing excle file.
@@ -204,11 +220,15 @@ def GUI():
             
         # If the previous option is true, ask for the import location.
         if inputs['Use settings file'] == True:
-            inputs = choose_settings_file_location(inputs)
+            inputs = choose_settings_file_location(inputs, default)
         
         # If the previous option is false, type in the genotypes/treatments.
         if inputs['Use settings file'] == False:
             inputs = create_settings_file(inputs)
             export_settings_file(inputs)
+    
+    # Export the inputs into a yaml file containing the default GUI values for 
+    # the next GUI run.
+    export_yaml_file(inputs, default)
             
     return(inputs)

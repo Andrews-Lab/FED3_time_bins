@@ -2,9 +2,6 @@ import pandas as pd
 import numpy as np
 import os
 
-def add(val,time):
-    return(val+time)
-    
 def last_nonnan_item(list1):
     if list1 is None:
         return(np.nan)
@@ -14,12 +11,6 @@ def last_nonnan_item(list1):
     else:
         return(nonnan_list[-1])
     
-def avg(list1):
-    if len(list1) == 0:
-        return(0)
-    else:
-        return(sum(list1)/len(list1))
-
 def find_time_bins(df, inputs):
     
     # Find the time bins.
@@ -93,8 +84,8 @@ def find_retrieval_time_changes(df):
     
     return(df_counts)
 
-def combine_TB_plus_RTC(df_counts, df_bins):
-
+def combine_tables(df_counts, df_bins):
+    
     # Create a dataframe with the time bins and retrieval time changes together.
     df_together = df_counts.copy()
     df_together.index.names = ['Time bins (mins)']
@@ -106,7 +97,10 @@ def combine_TB_plus_RTC(df_counts, df_bins):
     
     return(df_together)
 
-def add_additional_columns(df_ind, inputs):
+def add(val,time):
+    return(val+time)
+
+def add_additional_columns_to_sheet(df_ind, inputs):
     
     # Add in the columns for the time bins in minutes.  
     df_ind.insert(0, 'Time bins (mins)', df_ind.index)
@@ -137,6 +131,14 @@ def add_additional_columns(df_ind, inputs):
     df_ind.insert(ind, 'Pellet Count Change', count_change)
     
     return(df_ind)
+
+def add_additional_columns(sheets, inputs):
+    # Add the same columns to each sheet.
+    reordered = {}
+    new_order = ["All data", "Time bins", "Pellet count changes"]
+    for name in new_order:
+        reordered[name] = add_additional_columns_to_sheet(sheets[name], inputs)
+    return(reordered)
 
 def collect_paired_events_data(df):
     
@@ -196,64 +198,16 @@ def collect_paired_events_data(df):
     
     return(df, PE)
 
-# def collect_paired_events_data(df):
-    
-#     df["Latencies"] = df["Time"].diff().dt.total_seconds()
-#     keep_latencies = []
+def avg(list1):
+    if len(list1) == 0:
+        return(0)
+    else:
+        return(sum(list1)/len(list1))
 
-#     # Paired events analysis
-#     PE = {} 
-#     PE["Regular LRP count"]      = 0
-#     PE["Regular LRP indices"]    = []
-#     PE["Regular LRP latency LR"] = []
-#     PE["Regular LRP latency RP"] = []
-#     PE["Regular LN count"]       = 0
-#     PE["Regular LN indices"]     = []
-#     PE["Stop LNP count"]         = 0
-#     PE["Stop LNP indices"]       = []
-#     PE["Stop LNP latency NP"]    = []
-#     PE["Stop LR count"]          = 0
-#     PE["Stop LR indices"]        = []
-#     PE["Stop LR latency LR"]     = []
-    
-#     # Collect the paired events data.
-#     for i in range(1,len(df)):
-        
-#         if df.at[i-1,"Event"] == ">Left_Regular_trial" and df.at[i,"Event"] == "Right_Regular_(correct)":
-#             if i+1 < len(df) and df.at[i+1,"Event"] == "Pellet":
-#                 keep_latencies += [i]
-#                 keep_latencies += [i+1]
-#                 PE["Regular LRP count"]      += 1
-#                 PE["Regular LRP indices"]    += [i-1,i,i+1]
-#                 PE["Regular LRP latency LR"] += [df.at[i,  "Latencies"]]
-#                 PE["Regular LRP latency RP"] += [df.at[i+1,"Latencies"]]
-            
-#         if df.at[i-1,"Event"] == ">Left_Regular_trial" and df.at[i,"Event"] == "NoPoke_Regular_(incorrect)":
-#             PE["Regular LN count"]   += 1
-#             PE["Regular LN indices"] += [i-1,i]
-            
-#         if df.at[i-1,"Event"] == ">Left_Stop_trial" and df.at[i,"Event"] == "NoPoke_STOP_(correct)":
-#             if i+1 < len(df) and df.at[i+1,"Event"] == "Pellet":
-#                 keep_latencies += [i+1]
-#                 PE["Stop LNP count"]      += 1
-#                 PE["Stop LNP indices"]    += [i-1,i,i+1]
-#                 PE["Stop LNP latency NP"] += [df.at[i+1,"Latencies"]]
-            
-#         if df.at[i-1,"Event"] == ">Left_Stop_trial" and df.at[i,"Event"] == "Right_STOP_(incorrect)":
-#             keep_latencies += [i]
-#             PE["Stop LR count"]      += 1
-#             PE["Stop LR indices"]    += [i-1,i]
-#             PE["Stop LR latency LR"] += [df.at[i,"Latencies"]]
-            
-#     # Remove uninteresting latency data.
-#     vals_to_remove = [i for i in df.index if i not in keep_latencies]
-#     df.loc[vals_to_remove, "Latencies"] = np.nan
-    
-#     return(df, PE)
-
-def organise_paired_events_results(df, PE):
+def organise_paired_events_results(PE, inputs):
     
     results = {}
+    results["Filename"] = inputs["Filename"]
     
     # Regular LRP
     results["Regular LRP count"]                 = PE["Regular LRP count"]
@@ -278,6 +232,34 @@ def organise_paired_events_results(df, PE):
     results["Stop LR latency LR sum (secs)"]     = sum(PE["Stop LR latency LR"])
     results["Stop LR latency LR avg (secs)"]     = avg(PE["Stop LR latency LR"])
     results[" "*4] = np.nan
+    
+    # Total events variables
+    regular_LRP   = PE["Regular LRP count"]
+    regular_LN    = PE["Regular LN count"]
+    total_regular = regular_LRP + regular_LN
+    stop_LNP      = PE["Stop LNP count"]
+    stop_LR       = PE["Stop LR count"]
+    total_stop    = stop_LNP + stop_LR
+    total_events  = total_regular + total_stop
+    
+    # Events within regular or stop trials.
+    results["Regular LRP/total regular (%)"]   = (regular_LRP/total_regular)*100
+    results["Regular LN/total regular (%)"]    = (regular_LN/total_regular)*100
+    results["Total regular events"]            = total_regular
+    results["Stop LNP/total stop (%)"]         = (stop_LNP/total_stop)*100
+    results["Stop LR/total stop (%)"]          = (stop_LR/total_stop)*100
+    results["Total stop events"]               = total_stop
+    results[" "*5] = np.nan
+    
+    # Events within total trials.
+    results["Regular LRP/total events (%)"]    = (regular_LRP/total_events)*100
+    results["Regular LN/total events (%)"]     = (regular_LN/total_events)*100
+    results["Regular events/total events (%)"] = (total_regular/total_events)*100
+    results["Stop LNP/total events (%)"]       = (stop_LNP/total_events)*100
+    results["Stop LR/total events (%)"]        = (stop_LR/total_events)*100
+    results["Stop events/total events (%)"]    = (total_stop/total_events)*100
+    results["Total events"]                    = total_events
+    results[" "*6] = np.nan
     
     return(results)
 
@@ -320,49 +302,57 @@ def combine_results_and_raw_data(df, results, PE):
     
     # Concatenate the paired events overall analysis and raw data.
     sheet = pd.concat([results, df[["Time","Event","Latencies"]]])
+    sheet = sheet.iloc[1:] # Remove the row saying "Filename: ..."
     
     # Color code the sheet.
     sheet = sheet.style.apply(color, PE=PE, subset=["Event"], axis=0)
 
     return(sheet)
 
+def export_data(inputs, sheets):
+    # Export excel file with many sheets.
+    export_name = 'Time bins for '+inputs['Filename'][:-4]+'.xlsx'
+    export_destination = os.path.join(inputs['Export location'], export_name)
+    sheets_with_headers = ["Time bins", "Pellet count changes", "All data"]
+    with pd.ExcelWriter(export_destination) as writer:
+        for name in sheets.keys():
+            if name in sheets_with_headers:
+                sheets[name].to_excel(writer, sheet_name=name, index=False)
+            else:
+                sheets[name].to_excel(writer, sheet_name=name, index=False, header=False)
+
 def analyse_FED_file(df, inputs):
     
+    sheets = {}
+    
     # Find the time bins.
-    df_bins = find_time_bins(df, inputs)
+    sheets["Time bins"] = find_time_bins(df, inputs)
     
     # Create another dataframe with every non-zero change in retrieval time.
     # If there is a change in the pellet count and not in the retrieval time, include that time point.
-    df_counts = find_retrieval_time_changes(df)
+    sheets["Pellet count changes"] = find_retrieval_time_changes(df)
     
     # Create a dataframe with the time bins and retrieval time changes together.
-    df_together = combine_TB_plus_RTC(df_counts, df_bins)
+    sheets["All data"] = combine_tables(sheets["Pellet count changes"], sheets["Time bins"])
     
-    # Add more columns to each dataframe.
+    # Add more columns to the dataframes above.
     # These are time bins, date, time and pellet count changes.
-    df_together = add_additional_columns(df_together, inputs)
-    df_bins     = add_additional_columns(df_bins, inputs)
-    df_counts   = add_additional_columns(df_counts, inputs)
+    sheets = add_additional_columns(sheets, inputs)
     
-    # Add a sheet for latency data if the session type is StopSig.
-    if df.at[0,"Session Type"] == "StopSig": 
+    # Initialise the StopSig summary results.
+    results = {}
+    
+    if inputs["Session Type"] == "StopSig": 
         # Collected paired events data and add latency information to df.
         df, PE = collect_paired_events_data(df)
+        
         # Calculate sums and averages of latencies.
-        results = organise_paired_events_results(df, PE)
+        results = organise_paired_events_results(PE, inputs)
+        
         # Combine the overall results with the raw data and color code the sheet.
-        latency_sheet = combine_results_and_raw_data(df, results, PE)
-    else:
-        latency_sheet = pd.DataFrame()
+        sheets["Paired events"] = combine_results_and_raw_data(df, results, PE)
     
     # Export the data.
-    export_name = 'Time bins for '+inputs['Filename'][:-4]+'.xlsx'
-    export_destination = os.path.join(inputs['Export location'], export_name)
-    with pd.ExcelWriter(export_destination) as writer:
-        df_together.to_excel(writer, sheet_name='All data', index=False)
-        df_bins.to_excel(writer, sheet_name='Time bins', index=False)
-        df_counts.to_excel(writer, sheet_name='Pellet count changes', index=False)
-        if df.at[0,"Session Type"] == "StopSig":
-            latency_sheet.to_excel(writer, sheet_name='Paired events', index=False, header=False)
+    export_data(inputs, sheets)
         
-    return(df_together, df_bins, df_counts, latency_sheet)
+    return(sheets, results)

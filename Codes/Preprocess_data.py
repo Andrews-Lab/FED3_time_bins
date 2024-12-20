@@ -2,11 +2,11 @@ import pandas as pd
 import sys
 import os
 
-def replace_values(val,new_val):
-    return(new_val)
-
-def remove_prefix(val):
-    return(int(val[2:]))
+def import_data(inputs):
+    # Import the raw FED file.
+    import_destination = os.path.join(inputs['Import location'], inputs['Filename'])
+    df = pd.read_csv(import_destination)
+    return(df)
 
 def clean_data(df):
     # Clean the dataframe.  
@@ -23,7 +23,13 @@ def clean_data(df):
         df['Poke Time'] = df['Poke Time'].fillna(method="ffill")
     return(df)
 
-def correct_session_type_columns(df):
+def replace_values(val,new_val):
+    return(new_val)
+
+def remove_prefix(val):
+    return(int(val[2:]))
+
+def correct_session_type_columns(df, inputs):
     
     # Correct the session type columns.
     # Numbers that form part of the Progressive Ratio.
@@ -67,8 +73,10 @@ def correct_session_type_columns(df):
                 name = 'Unnamed ratio'
             df['FR']           = df['Session Type'].copy()
             df['Session Type'] = df['Session Type'].apply(replace_values, new_val=name)
+    
+    inputs["Session Type"] = df.at[0,"Session Type"]
             
-    return(df)
+    return(df, inputs)
 
 def combine_time_columns(df):
     # Combine time columns if there are 2.
@@ -81,6 +89,9 @@ def combine_time_columns(df):
     df["Time"] = pd.to_datetime(df["Time"])
     
     return(df)
+
+def find_date(time):
+    return(time.date())
 
 def edit_start_and_end_times(df, inputs):
     
@@ -95,8 +106,6 @@ def edit_start_and_end_times(df, inputs):
             date_time_components = str(inputs[time]).split(' ')
             date_time_components = [val for val in date_time_components if val!='']
             if len(date_time_components) == 1:
-                def find_date(time):
-                    return(time.date())
                 most_common_date = df["Time"].apply(find_date).mode()[0]
                 inputs[time] = str(most_common_date)+' '+inputs[time]
             
@@ -132,22 +141,6 @@ def edit_start_and_end_times(df, inputs):
         
     return(inputs)
 
-def add_additional_columns_stopsig(df):
-    
-    # There are some events that would be useful to summarise as separate 
-    # cumulative columns for the stopsig task.
-    if df.at[0,"Session Type"] == "StopSig":
-        
-        list_events = [">Left_Regular_trial",">Left_Stop_trial","LeftinTimeOut",
-                       "NoPoke_Regular_(incorrect)","NoPoke_STOP_(correct)","Pellet",
-                       "Right_no_left","Right_Regular_(correct)","RightDuringDispense",
-                       "RightinTimeout"]
-
-        for event in list_events:
-            df[event] = (df['Event'] == event).cumsum()
-            
-    return(df)
-
 def remove_data_outside_window(df, inputs):
     
     # Remove the data before the start time and after the end time.
@@ -162,17 +155,29 @@ def remove_data_outside_window(df, inputs):
     
     return(df)
 
+def add_additional_columns_stopsig(df):
+    
+    # There are some events that would be useful to summarise as separate 
+    # cumulative columns for the stopsig task.
+    list_events = [">Left_Regular_trial",">Left_Stop_trial","LeftinTimeOut",
+                   "NoPoke_Regular_(incorrect)","NoPoke_STOP_(correct)","Pellet",
+                   "Right_no_left","Right_Regular_(correct)","RightDuringDispense",
+                   "RightinTimeout"]
+    for event in list_events:
+        df[event] = (df['Event'] == event).cumsum()
+            
+    return(df)
+
 def preprocess_data(inputs):
     
     # Import the raw data.
-    import_destination = os.path.join(inputs['Import location'], inputs['Filename'])
-    df = pd.read_csv(import_destination)
+    df = import_data(inputs)
     
     # Clean the data.
     df = clean_data(df)
     
     # Correct session type columns.
-    df = correct_session_type_columns(df)
+    df, inputs = correct_session_type_columns(df, inputs)
     
     # Combine time columns if there are 2.
     df = combine_time_columns(df)
@@ -183,7 +188,8 @@ def preprocess_data(inputs):
     # Remove the data before the start time and after the end time.
     df = remove_data_outside_window(df, inputs)
     
-    # Add additional columns based on the events column for the stopsig task.
-    df = add_additional_columns_stopsig(df)
+    if inputs["Session Type"] == "StopSig":
+        # Add additional columns based on the events column for the stopsig task.
+        df = add_additional_columns_stopsig(df)
     
     return(df)

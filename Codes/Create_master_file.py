@@ -87,6 +87,12 @@ def add_time_columns_to_master(master, inputs):
     # The date, time and time bins are already added to each data sheet.
     for sheet in ['Time','Date','Time bins (mins)']:
         master.pop(sheet)
+
+    # Remove the blank sheets.
+    sheet_names = list(master.keys())
+    for sheet in sheet_names:
+        if len(master[sheet]) == 0:
+            master.pop(sheet)
         
     return(master)
 
@@ -98,3 +104,34 @@ def create_master_file(master, inputs):
     with pd.ExcelWriter(os.path.join(inputs['Export location'], 'Master.xlsx')) as writer:
         for sheet in master.keys():
             master[sheet].to_excel(writer, sheet_name=sheet)
+            
+def create_blank_stopsig_master():
+    return([])
+
+def add_to_stopsig_master(stopsig_master, stopsig_results):
+    stopsig_master += [stopsig_results]
+    return(stopsig_master)
+            
+def create_stopsig_master_file(stopsig_master, inputs):
+    
+    # Convert the list of dicts to a dataframe.
+    stopsig_master = pd.DataFrame(stopsig_master).T
+    stopsig_master.columns = stopsig_master.iloc[0]
+    stopsig_master = stopsig_master.drop("Filename")
+
+    # Add the genotypes and treatments to the columns and sort them by these headings.
+    def labels(filename, info):
+        return(gt_table.at[filename, info])
+    gt_table = inputs['Genotypes/treatments table']
+    headers    = pd.Series(stopsig_master.columns, index=stopsig_master.columns)
+    genotypes  = headers.apply(labels, info='Genotype').to_frame().T
+    treatments = headers.apply(labels, info='Treatment').to_frame().T
+    genotypes.index  = ['Genotype']
+    treatments.index = ['Treatment']
+    stopsig_master = pd.concat([treatments, stopsig_master])
+    stopsig_master = pd.concat([genotypes,  stopsig_master])
+    stopsig_master = stopsig_master.sort_values(by=['Genotype','Treatment'], axis=1)
+    
+    # Export the stopsig master file.
+    with pd.ExcelWriter(os.path.join(inputs['Export location'], 'StopSig_Master.xlsx')) as writer:
+        stopsig_master.to_excel(writer)
