@@ -19,8 +19,8 @@ def clean_data(df):
     df['Retrieval_Time'] = df['Retrieval_Time'].replace('Timed_out', 60).apply(pd.to_numeric)
     df = df.drop(columns=['FED_Version', 'Device_Number', 'Battery_Voltage'],errors="ignore")
     df.columns = df.columns.str.replace('_', ' ')
-    if 'Poke Time' in df.columns:
-        df['Poke Time'] = df['Poke Time'].fillna(method="ffill")
+    # if 'Poke Time' in df.columns:
+    #     df['Poke Time'] = df['Poke Time'].fillna(method="ffill")
     return(df)
 
 def replace_values(val,new_val):
@@ -79,6 +79,7 @@ def correct_session_type_columns(df, inputs):
     return(df, inputs)
 
 def combine_time_columns(df):
+    
     # Combine time columns if there are 2.
     if "MM:DD:YYYYhh:mm:ss" not in df.columns:
         df["MM:DD:YYYY"] = df["MM:DD:YYYY"] + " " + df["hh:mm:ss"]
@@ -86,6 +87,14 @@ def combine_time_columns(df):
         df = df.drop(columns=['hh:mm:ss'])
     else:
         df = df.rename(columns={"MM:DD:YYYYhh:mm:ss": "Time"})
+    
+    # Remove any rows with null dates.
+    # "0/0/" means the day and month are zero.
+    rows_without_null_dates = df["Time"].str.contains("0/0/")==False
+    df = df[rows_without_null_dates]
+    df.index = list(range(len(df)))
+    
+    # Convert the values to the datetime format.
     df["Time"] = pd.to_datetime(df["Time"])
     
     return(df)
@@ -168,6 +177,19 @@ def add_additional_columns_stopsig(df):
             
     return(df)
 
+def check_for_incomplete_closedecon_data(df, inputs):
+    
+    # Check whether the block pellet count is monotonically increasing.
+    # This means there is only 1 block and it is incomplete.
+    # To exclude this from the special closed economy analysis, change the session type. 
+    if df["Block Pellet Count"].is_monotonic_increasing:
+        inputs["Session Type"] = "Incomplete_ClosedEcon"
+        df["Session Type"] = "Incomplete_ClosedEcon"
+        print(f"\n\n{inputs['Filename']} has been excluded from the closed economy analysis "+
+              "because there is only 1 block and it is incomplete.\n")
+    
+    return(df, inputs)
+
 def preprocess_data(inputs):
     
     # Import the raw data.
@@ -192,4 +214,8 @@ def preprocess_data(inputs):
         # Add additional columns based on the events column for the stopsig task.
         df = add_additional_columns_stopsig(df)
     
-    return(df)
+    if inputs["Session Type"] == "ClosedEcon_PR1":
+        # Rename session type if there is only 1 block of incomplete data.
+        df, inputs = check_for_incomplete_closedecon_data(df, inputs)
+    
+    return(df, inputs)

@@ -1,3 +1,4 @@
+from Preprocess_data import import_data, clean_data, correct_session_type_columns
 import pandas as pd
 import os
 import PySimpleGUI as sg
@@ -93,6 +94,46 @@ def basic_options(default):
         
     return(inputs)
 
+def check_session_type(inputs):
+    
+    # Find the first file in the folder.
+    import_files = [file for file in os.listdir(inputs['Import location']) if 
+                    (file.lower().endswith(".csv") and file.startswith("~$")==False)]
+    inputs["Filename"] = import_files[0]
+    
+    # Process the file to find the session type.
+    df = import_data(inputs)
+    df = clean_data(df)
+    df, inputs = correct_session_type_columns(df, inputs)
+    
+    return(inputs["Session Type"])
+
+def choose_light_dark_cycle(inputs, default):
+    
+    sg.theme("DarkTeal2")
+    layout = [
+        [sg.T("")], [sg.Text("Light cycle times", size=(14,1)), 
+                     sg.Input(default_text=default['Light cycle start'],key="Light cycle start",
+                              enable_events=True, size=(10,1)),
+                     sg.Input(default_text=default['Light cycle end'],key="Light cycle end",
+                              enable_events=True, size=(10,1))],
+        [sg.T("")], [sg.Text("The dark cycle times will be filled in automatically")], 
+        [sg.T("")], [sg.Button("Submit")]
+             ]
+    window = sg.Window('Choose the start and end times of the light cycle', layout)
+    while True:
+        event, values = window.read()
+        if event == sg.WIN_CLOSED or event=="Exit":
+            window.close()
+            sys.exit()
+        elif event == "Submit":
+            inputs['Light cycle start'] = values['Light cycle start']
+            inputs['Light cycle end']   = values['Light cycle end']
+            window.close()
+            break
+    
+    return(inputs)    
+
 def import_settings_file(inputs, default):
     
     sg.theme("DarkTeal2")
@@ -149,14 +190,16 @@ def create_settings_file(inputs):
                     (file.lower().endswith(".csv") and file.startswith("~$")==False)]
     sg.theme("DarkTeal2")
     size1 = (30,1)
-    size2 = (34,1)
-    layout = [[sg.T("")], [sg.Text('Filename',size=size1), 
-                           sg.Text('Genotype',size=size1),
-                           sg.Text('Treatment',size=size1)]]
+    size2 = (20,1)
+    layout = [[sg.T("")], [sg.Text('Filename', size=size1), 
+                           sg.Input(default_text="Genotype",  key="Name1", size=size2),
+                           sg.Input(default_text="Treatment", key="Name2", size=size2),
+                           sg.Input(default_text="Mouse ID",  key="Name3", size=size2)]]
     for filename in import_files:
-        layout += [[sg.Text(filename,size=size1), 
-                    sg.Input(size=size2,key=filename+'_Genotype'),
-                    sg.Input(size=size2,key=filename+'_Treatment')]]
+        layout += [[sg.Text(filename, size=size1), 
+                    sg.Input(size=size2, key=filename+'_Name1'),
+                    sg.Input(size=size2, key=filename+'_Name2'),
+                    sg.Input(size=size2, key=filename+'_Name3')]]
     layout += [[sg.T("")], [sg.Button("Submit")]]
     window = sg.Window('Fill in the genotypes/treatments', layout)
     while True:
@@ -165,12 +208,16 @@ def create_settings_file(inputs):
             window.close()
             sys.exit()
         elif event == "Submit":
-            gt_table = pd.DataFrame(columns=['Genotype','Treatment'],
+            name1 = values["Name1"]
+            name2 = values["Name2"]
+            name3 = values["Name3"]
+            gt_table = pd.DataFrame(columns=[name1,name2,name3],
                                     index=import_files)
             gt_table.index.name = 'Filename'
             for filename in import_files:
-                gt_table.at[filename,'Genotype']  = values[filename+'_Genotype']
-                gt_table.at[filename,'Treatment'] = values[filename+'_Treatment']
+                gt_table.at[filename,name1] = values[filename+'_Name1']
+                gt_table.at[filename,name2] = values[filename+'_Name2']
+                gt_table.at[filename,name3] = values[filename+'_Name3']
             window.close()
             break    
     inputs['Genotypes/treatments table'] = gt_table
@@ -194,7 +241,8 @@ def export_yaml_file(inputs, default):
     export = {}
     entries = ['Import location','Export location','Start time type','Start time',
                'End time type','End time','Time bin (mins)','Find individual columns',
-               'Use settings file','Settings import location']
+               'Use settings file','Settings import location','Light cycle start',
+               'Light cycle end']
     for entry in entries:
         if entry in inputs.keys():
             export[entry] = inputs[entry]
@@ -213,6 +261,9 @@ def GUI():
     
     default = import_yaml_file()
     inputs = basic_options(default)
+    
+    if check_session_type(inputs) == 'ClosedEcon_PR1':
+        inputs = choose_light_dark_cycle(inputs, default)
     
     # If find individual columns is true, ask whether to import an existing excle file.
     if inputs['Find individual columns'] == True:

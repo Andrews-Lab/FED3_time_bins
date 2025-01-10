@@ -1,4 +1,5 @@
 import pandas as pd
+import sys
 import os
 
 def create_blank_master():
@@ -37,13 +38,11 @@ def add_genotypes_treatments_to_master(master, inputs):
     # Add the genotypes and treatments to the columns and sort them by these headings.
     for sheet in master.keys():
         headers    = pd.Series(master[sheet].columns, index=master[sheet].columns)
-        genotypes  = headers.apply(labels, info='Genotype').to_frame().T
-        treatments = headers.apply(labels, info='Treatment').to_frame().T
-        genotypes.index  = ['Genotype']
-        treatments.index = ['Treatment']
-        master[sheet] = pd.concat([treatments, master[sheet]])
-        master[sheet] = pd.concat([genotypes,  master[sheet]])
-        master[sheet] = master[sheet].sort_values(by=['Genotype','Treatment'], axis=1)
+        for name in gt_table.columns:
+            table = headers.apply(labels, info=name).to_frame().T
+            table.index = [name]
+            master[sheet] = pd.concat([table, master[sheet]])
+        master[sheet] = master[sheet].sort_values(by=list(gt_table.columns), axis=1)
         
     return(master)
 
@@ -57,17 +56,18 @@ def add_time_columns_to_master(master, inputs):
 
     # Add time column(s) to each sheet about left poke count, right poke count, ...
     # First, find the filename with the most rows.
+    names = inputs['Genotypes/treatments table'].columns
     longest_file = master['Time bins (mins)'].apply(pd.isna).sum().idxmin()
     time = {}
     for col in ['Time bins (mins)', 'Time', 'Date']:
         time[col] = master[col][longest_file].copy()
         time[col].name = col
         if different_start_times == True: 
-            time[col].at['Genotype']  = 'Genotype'
-            time[col].at['Treatment'] = 'Treatment'
+            for name in names:
+                time[col].at[name] = name
         if different_start_times == False: 
-            time[col].at['Genotype']  = ''
-            time[col].at['Treatment'] = ''
+            for name in names:
+                time[col].at[name] = ''
 
     for sheet in master.keys():
         # If the first active poke is used as the start time, only add time bins to
@@ -108,8 +108,8 @@ def create_master_file(master, inputs):
 def create_blank_stopsig_master():
     return([])
 
-def add_to_stopsig_master(stopsig_master, stopsig_results):
-    stopsig_master += [stopsig_results]
+def add_to_stopsig_master(stopsig_master, stopsig):
+    stopsig_master += [stopsig]
     return(stopsig_master)
             
 def create_stopsig_master_file(stopsig_master, inputs):
@@ -123,15 +123,65 @@ def create_stopsig_master_file(stopsig_master, inputs):
     def labels(filename, info):
         return(gt_table.at[filename, info])
     gt_table = inputs['Genotypes/treatments table']
-    headers    = pd.Series(stopsig_master.columns, index=stopsig_master.columns)
-    genotypes  = headers.apply(labels, info='Genotype').to_frame().T
-    treatments = headers.apply(labels, info='Treatment').to_frame().T
-    genotypes.index  = ['Genotype']
-    treatments.index = ['Treatment']
-    stopsig_master = pd.concat([treatments, stopsig_master])
-    stopsig_master = pd.concat([genotypes,  stopsig_master])
-    stopsig_master = stopsig_master.sort_values(by=['Genotype','Treatment'], axis=1)
+    headers = pd.Series(stopsig_master.columns, index=stopsig_master.columns)
+    for name in gt_table.columns:
+        table = headers.apply(labels, info=name).to_frame().T
+        table.index = [name]
+        stopsig_master = pd.concat([table, stopsig_master])
+    stopsig_master = stopsig_master.sort_values(by=list(gt_table.columns), axis=1)
     
     # Export the stopsig master file.
     with pd.ExcelWriter(os.path.join(inputs['Export location'], 'StopSig_Master.xlsx')) as writer:
         stopsig_master.to_excel(writer)
+
+def create_blank_closedecon_master():
+    return({"Blocks":[], "Cycles":[], "Days":[], "Total":[]})
+
+def add_to_closedecon_master(closedecon_master, closedecon):
+    for key in closedecon_master.keys():
+        closedecon_master[key] += closedecon[key]
+    return(closedecon_master)
+
+def create_closedecon_master_file(closedecon_master, inputs):
+    
+    gt_table = inputs['Genotypes/treatments table']
+    def labels(filename, info):
+        return(gt_table.at[filename, info])
+    
+    # Convert the list of dicts to a dataframe.
+    for sheet in closedecon_master.keys():
+        closedecon_master[sheet] = pd.DataFrame(closedecon_master[sheet]).T
+        closedecon_master[sheet].columns = closedecon_master[sheet].iloc[0]
+        closedecon_master[sheet] = closedecon_master[sheet].drop("Filename")
+
+        # Add the genotypes and treatments to the columns and sort them by these headings.
+        headers = pd.Series(closedecon_master[sheet].columns, index=closedecon_master[sheet].columns)
+        for name in gt_table.columns:
+            table = headers.apply(labels, info=name).to_frame().T
+            table.index = [name]
+            closedecon_master[sheet] = pd.concat([table, closedecon_master[sheet]])
+        closedecon_master[sheet] = closedecon_master[sheet].sort_values(by=list(gt_table.columns), axis=1)
+        
+        # Rotate the table in contrast to previous master files.
+        closedecon_master[sheet] = closedecon_master[sheet].T
+        closedecon_master[sheet].insert(3,"Filename",closedecon_master[sheet].index)
+
+    # Rename columns.
+    renamed = {"Number of blocks":"Block numbers"}
+    closedecon_master["Blocks"] = closedecon_master["Blocks"].rename(columns=renamed)
+
+    # Drop columns.
+    blocks_drop = ["Completed cycles", "Completed days"]
+    cycles_drop = ["Completed days"]
+    days_drop   = ["Completed cycles"]
+    total_drop  = ["Completed cycles", "Completed days", "Light/dark"]
+    closedecon_master["Blocks"] = closedecon_master["Blocks"].drop(columns=blocks_drop)
+    closedecon_master["Cycles"] = closedecon_master["Cycles"].drop(columns=cycles_drop)
+    closedecon_master["Days"]   = closedecon_master["Days"  ].drop(columns=days_drop)
+    closedecon_master["Total"]  = closedecon_master["Total" ].drop(columns=total_drop)
+    
+    # Export the closedecon master file.
+    export_destination = os.path.join(inputs['Export location'], 'ClosedEcon_Master.xlsx')
+    with pd.ExcelWriter(export_destination) as writer:
+        for sheet in closedecon_master.keys():
+            closedecon_master[sheet].to_excel(writer, sheet_name=sheet, index=False)

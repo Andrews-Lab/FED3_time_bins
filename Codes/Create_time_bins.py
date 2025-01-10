@@ -200,9 +200,15 @@ def collect_paired_events_data(df):
 
 def avg(list1):
     if len(list1) == 0:
-        return(0)
+        return(np.nan)
     else:
         return(sum(list1)/len(list1))
+
+def per(val1, val2):
+    if val2 == 0:
+        return(np.nan)
+    else:
+        return((val1/val2)*100)
 
 def organise_paired_events_results(PE, inputs):
     
@@ -243,21 +249,21 @@ def organise_paired_events_results(PE, inputs):
     total_events  = total_regular + total_stop
     
     # Events within regular or stop trials.
-    results["Regular LRP/total regular (%)"]   = (regular_LRP/total_regular)*100
-    results["Regular LN/total regular (%)"]    = (regular_LN/total_regular)*100
+    results["Regular LRP/total regular (%)"]   = per(regular_LRP, total_regular)
+    results["Regular LN/total regular (%)"]    = per(regular_LN, total_regular)
     results["Total regular events"]            = total_regular
-    results["Stop LNP/total stop (%)"]         = (stop_LNP/total_stop)*100
-    results["Stop LR/total stop (%)"]          = (stop_LR/total_stop)*100
+    results["Stop LNP/total stop (%)"]         = per(stop_LNP, total_stop)
+    results["Stop LR/total stop (%)"]          = per(stop_LR, total_stop)
     results["Total stop events"]               = total_stop
     results[" "*5] = np.nan
     
     # Events within total trials.
-    results["Regular LRP/total events (%)"]    = (regular_LRP/total_events)*100
-    results["Regular LN/total events (%)"]     = (regular_LN/total_events)*100
-    results["Regular events/total events (%)"] = (total_regular/total_events)*100
-    results["Stop LNP/total events (%)"]       = (stop_LNP/total_events)*100
-    results["Stop LR/total events (%)"]        = (stop_LR/total_events)*100
-    results["Stop events/total events (%)"]    = (total_stop/total_events)*100
+    results["Regular LRP/total events (%)"]    = per(regular_LRP, total_events)
+    results["Regular LN/total events (%)"]     = per(regular_LN, total_events)
+    results["Regular events/total events (%)"] = per(total_regular, total_events)
+    results["Stop LNP/total events (%)"]       = per(stop_LNP, total_events)
+    results["Stop LR/total events (%)"]        = per(stop_LR, total_events)
+    results["Stop events/total events (%)"]    = per(total_stop, total_events)
     results["Total events"]                    = total_events
     results[" "*6] = np.nan
     
@@ -321,9 +327,164 @@ def export_data(inputs, sheets):
             else:
                 sheets[name].to_excel(writer, sheet_name=name, index=False, header=False)
 
+def identify_cycle(val, start, end):
+    # Check for the light and dark cycles with only times and no dates.
+    time = val.time()
+    if start < end:
+        if time >= start and time < end:
+            return("Light")
+        else:
+            return("Dark")
+    else:
+        if time >= start or time < end:
+            return("Light")
+        else:
+            return("Dark")
+
+def return_y_or_n(val, list1):
+    if val not in list1:
+        return("Y")
+    else:
+        return("N")
+
+def add_time_info(df, inputs):
+    
+    # Find the block numbers using the moments that the block pellet count goes
+    # down such as 0,1,2,3,0,...
+    df["Blocks"] = (df["Block Pellet Count"].diff() < 0).cumsum() + 1
+
+    # Find the cycle names.
+    start = pd.to_datetime(inputs["Light cycle start"]).time()
+    end   = pd.to_datetime(inputs["Light cycle end"]).time()
+    df["Light/Dark"] = df["Time"].apply(identify_cycle, start=start, end=end)
+    df["Cycles"] = (df["Light/Dark"] != df["Light/Dark"].shift()).cumsum()
+    
+    # Find the day numbers.
+    # Subtract the time of the light cycle start from the Time column, so that
+    # the light cycle starts at midnight. 
+    light_cycle_start = pd.to_timedelta(inputs["Light cycle start"])
+    df["Days"] = (df["Time"] - light_cycle_start)
+    df["Days"] = df["Days"].apply(lambda x: x.date())
+    df["Days"] = (df["Days"] != df["Days"].shift()).cumsum()
+    if df.at[0,"Light/Dark"] == "Dark":
+        df["Days"] = df["Days"] - 1
+    
+    # Find the animal number, which is just 1 to indicate analysis of whole file.
+    df["Total"] = 1
+    
+    # Exclude the last block, which is incomplete by definition.
+    last_block_num = df["Blocks"].unique()[-1]
+    df = df[df["Blocks"] != last_block_num].copy()
+    
+    # Indicate whether cycles and days are complete or not.
+    # By defintion, the first and last cycles and days are incomplete.
+    first_and_last_cycles = [df["Cycles"].iloc[0], df["Cycles"].iloc[-1]]
+    first_and_last_days   = [df["Days"  ].iloc[0], df["Days"  ].iloc[-1]]
+    df["Completed cycles"] = df["Cycles"].apply(return_y_or_n, list1=first_and_last_cycles)
+    df["Completed days"]   = df["Days"  ].apply(return_y_or_n, list1=first_and_last_days)
+    
+    return(df)
+
+def get_block_stats(series, name):
+    # This is for block stats.
+    first_value = series.iloc[0]
+    if name == "Blocks":
+        return(first_value)
+    else:
+        return(len(series.unique()))
+
+def get_other_stats(series):
+    # This is for light/dark and day stats.
+    first_value = series.unique()[0]
+    if len(series.unique()) == 1:
+        return(first_value)
+    else:
+        list_strings = series.astype(str).unique()
+        one_string   = "-".join(list_strings)
+        return(one_string)
+
+def analyse_data(df, inputs, name):
+
+    filename = inputs["Filename"]
+    numbers  = df[name].unique()
+    collated = []
+    
+    for num in numbers:
+
+        # Initialise the variables.
+        start             = df.index[df[name] == num][0]
+        end               = df.index[df[name] == num][-1]
+        blocks            = get_block_stats(df.loc[start:end,"Blocks"], name)
+        lightdark         = get_other_stats(df.loc[start:end,"Light/Dark"])
+        days              = get_other_stats(df.loc[start:end,"Days"])
+        completed_cycles  = get_other_stats(df.loc[start:end,"Completed cycles"])
+        completed_days    = get_other_stats(df.loc[start:end,"Completed days"])
+        start_time        = df.at[start,"Time"]
+        end_time          = df.at[end,  "Time"]
+        length_mins       = (end_time - start_time).total_seconds()*(1/60)
+        start_left_pokes  = df.at[start,"Left Poke Count"]
+        end_left_pokes    = df.at[end,  "Left Poke Count"]
+        num_left_pokes    = end_left_pokes - start_left_pokes
+        start_right_pokes = df.at[start,"Right Poke Count"]
+        end_right_pokes   = df.at[end,  "Right Poke Count"]
+        num_right_pokes   = end_right_pokes - start_right_pokes
+        total_pokes       = num_left_pokes + num_right_pokes
+        start_pellets     = df.at[start,"Pellet Count"]
+        end_pellets       = df.at[end,  "Pellet Count"]
+        pellet_count      = end_pellets - start_pellets
+        retrieval_times   = df.loc[start:end,"Retrieval Time"]
+        IPIs              = df.loc[start:end,"Interpellet Interval"]
+        poke_times        = df.loc[start:end,"Poke Time"]
+        sum_retrievals    = retrieval_times.sum()
+        sum_IPIs          = IPIs.sum()
+        sum_poke_times    = poke_times.sum()
+        avg_retrievals    = retrieval_times.mean()
+        avg_IPIs          = IPIs.mean()
+        avg_poke_times    = poke_times.mean()
+        
+        # Add these variables to the results dictionary.
+        results = {}
+        results["Filename"]                       = filename
+        results["Number of blocks"]               = blocks
+        results["Light/dark"]                     = lightdark
+        results["Days"]                           = days
+        results["Completed cycles"]               = completed_cycles
+        results["Completed days"]                 = completed_days
+        results["Start time"]                     = start_time
+        results["End time"]                       = end_time
+        results["Length (mins)"]                  = length_mins
+        results["Left poke count"]                = num_left_pokes
+        results["Right poke count"]               = num_right_pokes
+        results["Total pokes"]                    = total_pokes
+        results["Pellet count"]                   = pellet_count
+        results["Sum of retrieval times (secs)"]  = sum_retrievals
+        results["Sum of IPIs (secs)"]             = sum_IPIs
+        results["Sum of poke times (secs)"]       = sum_poke_times
+        results["Average retrieval times (secs)"] = avg_retrievals
+        results["Average IPIs (secs)"]            = avg_IPIs
+        results["Average poke times (secs)"]      = avg_poke_times
+        collated += [results]
+    
+    return(collated)
+
+def collect_data_subsets(df, inputs):
+    
+    # Perform the same analysis using "Blocks", "Cycles" and "Days".
+    closedecon = {}
+    for name in ["Blocks","Cycles","Days"]:
+        closedecon[name] = analyse_data(df, inputs, name)
+    
+    # For the analysis of whole animals, exclude the incomplete days.
+    df_compdays = df[df["Completed days"] == "Y"]
+    closedecon["Total"] = analyse_data(df_compdays, inputs, "Total")
+    
+    return(closedecon)
+
 def analyse_FED_file(df, inputs):
     
-    sheets = {}
+    sheets     = {}
+    stopsig    = {}
+    closedecon = {}
     
     # Find the time bins.
     sheets["Time bins"] = find_time_bins(df, inputs)
@@ -338,21 +499,25 @@ def analyse_FED_file(df, inputs):
     # Add more columns to the dataframes above.
     # These are time bins, date, time and pellet count changes.
     sheets = add_additional_columns(sheets, inputs)
-    
-    # Initialise the StopSig summary results.
-    results = {}
-    
+
     if inputs["Session Type"] == "StopSig": 
         # Collected paired events data and add latency information to df.
         df, PE = collect_paired_events_data(df)
         
         # Calculate sums and averages of latencies.
-        results = organise_paired_events_results(PE, inputs)
+        stopsig = organise_paired_events_results(PE, inputs)
         
         # Combine the overall results with the raw data and color code the sheet.
-        sheets["Paired events"] = combine_results_and_raw_data(df, results, PE)
+        sheets["Paired events"] = combine_results_and_raw_data(df, stopsig, PE)
+
+    if inputs["Session Type"] == "ClosedEcon_PR1":
+        # Add block, light/dark cycle and day information as columns.
+        df = add_time_info(df, inputs)
+        
+        # Collect statistics grouped by blocks, cycles and days.
+        closedecon = collect_data_subsets(df, inputs)
     
     # Export the data.
     export_data(inputs, sheets)
         
-    return(sheets, results)
+    return(sheets, stopsig, closedecon)
