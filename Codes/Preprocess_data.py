@@ -8,7 +8,8 @@ def import_data(inputs):
     df = pd.read_csv(import_destination)
     return(df)
 
-def clean_data(df):
+def clean_data(df, inputs, print_message=True):
+    
     # Clean the dataframe.  
     df = df.dropna(how='all')
     df.index = list(range(len(df)))
@@ -16,11 +17,33 @@ def clean_data(df):
     df.columns = df.columns.str.replace('FR_Ratio', 'Session_Type')
     df.columns = df.columns.str.replace('Session_type', 'Session_Type')
     df.columns = df.columns.str.replace('InterPelletInterval', 'Interpellet_Interval')
-    df['Retrieval_Time'] = df['Retrieval_Time'].replace('Timed_out', 60).apply(pd.to_numeric)
+    df['Retrieval_Time'] = df['Retrieval_Time'].replace('Timed_out', 60)
     df = df.drop(columns=['FED_Version', 'Device_Number', 'Battery_Voltage'],errors="ignore")
     df.columns = df.columns.str.replace('_', ' ')
-    # if 'Poke Time' in df.columns:
-    #     df['Poke Time'] = df['Poke Time'].fillna(method="ffill")
+    
+    # Check whether the last row has been cut off and exclude if needed.
+    if df.columns[-1] == "Poke Time":
+        
+        # Import the file again, but without converting "nan" to np.nan.
+        import_destination = os.path.join(inputs['Import location'], inputs['Filename'])
+        raw = pd.read_csv(import_destination, keep_default_na=False)
+        raw = raw.dropna(how='all')
+        raw.index = list(range(len(raw)))
+        raw.columns = raw.columns.str.replace(' ', '')
+        raw.columns = raw.columns.str.replace('_', ' ')
+        
+        # If the last value is not a number or "nan", exclude that row.
+        last_value = raw["Poke Time"].iloc[-1]
+        if last_value in ["","n","na"]:
+            last_index = df.index[-1]
+            df = df.drop(last_index)
+            if print_message:
+                print(f"\n\nThe last row of {inputs['Filename']} is cut off, "+
+                      "so this row has been dropped from the analysis.\n")
+    
+    # Now make the retrieval time column numeric.
+    df['Retrieval Time'] = df['Retrieval Time'].apply(pd.to_numeric)
+    
     return(df)
 
 def replace_values(val,new_val):
@@ -196,7 +219,7 @@ def preprocess_data(inputs):
     df = import_data(inputs)
     
     # Clean the data.
-    df = clean_data(df)
+    df = clean_data(df, inputs)
     
     # Correct session type columns.
     df, inputs = correct_session_type_columns(df, inputs)

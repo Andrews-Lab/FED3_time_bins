@@ -103,7 +103,7 @@ def check_session_type(inputs):
     
     # Process the file to find the session type.
     df = import_data(inputs)
-    df = clean_data(df)
+    df = clean_data(df, inputs, print_message=False)
     df, inputs = correct_session_type_columns(df, inputs)
     
     return(inputs["Session Type"])
