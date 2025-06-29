@@ -2,10 +2,21 @@ import pandas as pd
 import sys
 import os
 
+def find_import_files(inputs):
+    
+    # Find the import files.
+    import_files = [
+        file for file in os.listdir(inputs['Import location']) if
+        file.lower().endswith(".csv") and not file.startswith("~$")
+    ]
+    return(import_files)
+
 def import_data(inputs):
+    
     # Import the raw FED file.
     import_destination = os.path.join(inputs['Import location'], inputs['Filename'])
     df = pd.read_csv(import_destination)
+    
     return(df)
 
 def clean_data(df, inputs, print_message=True):

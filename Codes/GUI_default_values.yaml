@@ -1,5 +1,5 @@
-Import location: C:/Users/hazza/Downloads/Closed_economy
-Export location: C:/Users/hazza/Downloads/Closed_economy
+Import location: C:/Users/hazza/Downloads/Bandit
+Export location: C:/Users/hazza/Downloads/Bandit
 Start time type: Use first timestamp
 Start time: 2/07/2022 19:31:12
 End time type: Use last timestamp
@@ -7,6 +7,6 @@ End time: 2/07/2022 21:48:57
 Time bin (mins): 1.0
 Find individual columns: true
 Use settings file: true
-Settings import location: C:/Users/hazza/Downloads/Closed_economy/Settings_excel_file0.xlsx
+Settings import location: C:/Users/hazza/Downloads/Bandit/Settings_excel_file0.xlsx
 Light cycle start: '22:00:00'
 Light cycle end: '10:00:00'

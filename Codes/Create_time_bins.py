@@ -1,5 +1,9 @@
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('agg')
 import pandas as pd
 import numpy as np
+import sys
 import os
 
 def last_nonnan_item(list1):
@@ -328,6 +332,7 @@ def export_data(inputs, sheets):
                 sheets[name].to_excel(writer, sheet_name=name, index=False, header=False)
 
 def identify_cycle(val, start, end):
+    
     # Check for the light and dark cycles with only times and no dates.
     time = val.time()
     if start < end:
@@ -342,6 +347,8 @@ def identify_cycle(val, start, end):
             return("Dark")
 
 def return_y_or_n(val, list1):
+    
+    # Check whether a value is not in a list.
     if val not in list1:
         return("Y")
     else:
@@ -352,6 +359,10 @@ def add_time_info(df, inputs):
     # Find the block numbers using the moments that the block pellet count goes
     # down such as 0,1,2,3,0,...
     df["Blocks"] = (df["Block Pellet Count"].diff() < 0).cumsum() + 1
+    one_high_prob_poke_per_block = df.groupby("Blocks")["High prob poke"].nunique().eq(1).all()
+    if one_high_prob_poke_per_block == False:
+        print("There is more than 1 high prob poke within a block")
+        sys.exit()
 
     # Find the cycle names.
     start = pd.to_datetime(inputs["Light cycle start"]).time()
@@ -364,28 +375,75 @@ def add_time_info(df, inputs):
     # the light cycle starts at midnight. 
     light_cycle_start = pd.to_timedelta(inputs["Light cycle start"])
     df["Days"] = (df["Time"] - light_cycle_start)
-    df["Days"] = df["Days"].apply(lambda x: x.date())
+    df["Days"] =  df["Days"].apply(lambda x: x.date())
     df["Days"] = (df["Days"] != df["Days"].shift()).cumsum()
     if df.at[0,"Light/Dark"] == "Dark":
         df["Days"] = df["Days"] - 1
     
     # Find the animal number, which is just 1 to indicate analysis of whole file.
     df["Total"] = 1
-    
-    # Exclude the last block, which is incomplete by definition.
-    last_block_num = df["Blocks"].unique()[-1]
-    df = df[df["Blocks"] != last_block_num].copy()
-    
-    # Indicate whether cycles and days are complete or not.
-    # By defintion, the first and last cycles and days are incomplete.
-    first_and_last_cycles = [df["Cycles"].iloc[0], df["Cycles"].iloc[-1]]
-    first_and_last_days   = [df["Days"  ].iloc[0], df["Days"  ].iloc[-1]]
-    df["Completed cycles"] = df["Cycles"].apply(return_y_or_n, list1=first_and_last_cycles)
-    df["Completed days"]   = df["Days"  ].apply(return_y_or_n, list1=first_and_last_days)
+
+    # Indicate whether the blocks, cycles and days are complete or not.
+    # By defintion, the last block and the first and last cycles and days are 
+    # incomplete.
+    last_block             = [df["Blocks"].iloc[-1]]
+    first_and_last_cycles  = [df["Cycles"].iloc[0], df["Cycles"].iloc[-1]]
+    first_and_last_days    = [df["Days"  ].iloc[0], df["Days"  ].iloc[-1]]
+    df["Completed blocks"] =  df["Blocks"].apply(return_y_or_n, list1=last_block)
+    df["Completed cycles"] =  df["Cycles"].apply(return_y_or_n, list1=first_and_last_cycles)
+    df["Completed days"]   =  df["Days"  ].apply(return_y_or_n, list1=first_and_last_days)
     
     return(df)
 
+def add_bandit_info(df):
+    
+    # Add statistics for the plotting.
+    df["Low prob poke"] = df["High prob poke"].map({"Left":"Right","Right":"Left"})
+    df["Is left"]       = df["Event"] == "Left"
+    df["Is right"]      = df["Event"] == "Right"
+    df["Cumul left"]    = df["Is left"].groupby(df["Blocks"]).cumsum()
+    df["Cumul right"]   = df["Is right"].groupby(df["Blocks"]).cumsum()
+    df["Cumul prop"]    = df["Cumul left"] / (df["Cumul left"] + df["Cumul right"])
+    df["Ideal prop"]    = df["High prob poke"].map({"Left":1,"Right":0})
+    
+    return(df)
+
+def plot_pokes_and_blocks(df, inputs):
+
+    # Define important variables.
+    num_blocks = df["Blocks"].max()
+    full_name = [inputs['Filename'][:-4]]
+    
+    # Add genotype and treatment information if it is there.
+    if inputs['Find individual columns']:        
+        gt_table = inputs['Genotypes/treatments table']
+        genotype, treatment, mouse_ID = gt_table.loc[inputs["Filename"]]
+        full_name += [genotype, treatment, mouse_ID]
+    
+    # Plot the data.
+    plt.figure(figsize=(num_blocks*(12/29), 4))
+    plt.plot(range(len(df)), df["Ideal prop"], color="grey", label="Ideal proportion")
+    plt.plot(range(len(df)), df["Cumul prop"], color="blue", label="Proportion")
+    plt.title(" ".join(full_name))
+    plt.xlabel("Number of left, right or pellet trials")
+    plt.ylabel("Left / (left + right) within each block")
+    plt.legend(loc='lower right', bbox_to_anchor=(1, 1), ncol=2)
+    
+    # Export the plot.
+    export_name = f'{"_".join(full_name)}.png'
+    export_destination = os.path.join(inputs['Plots location'], export_name)
+    plt.savefig(export_destination, bbox_inches="tight")
+    plt.close()
+
+    # Record the plotting data.
+    plot_data = {
+        tuple(full_name + ["Proportion"]):       df["Cumul prop"].tolist(),
+        tuple(full_name + ["Ideal proportion"]): df["Ideal prop"].tolist()
+    }
+    return(plot_data)
+        
 def get_block_stats(series, name):
+    
     # This is for block stats.
     first_value = series.iloc[0]
     if name == "Blocks":
@@ -393,98 +451,190 @@ def get_block_stats(series, name):
     else:
         return(len(series.unique()))
 
-def get_other_stats(series):
-    # This is for light/dark and day stats.
-    first_value = series.unique()[0]
-    if len(series.unique()) == 1:
-        return(first_value)
-    else:
-        list_strings = series.astype(str).unique()
-        one_string   = "-".join(list_strings)
-        return(one_string)
+def generate_results_closedecon(df_short, results, name):
+    
+    # Initialise the variables.
+    blocks            = get_block_stats(df_short["Blocks"], name)
+    lightdark         = "-".join(df_short["Light/Dark"      ].astype(str).unique())
+    days              = "-".join(df_short["Days"            ].astype(str).unique())
+    completed_cycles  = "-".join(df_short["Completed cycles"].astype(str).unique())
+    completed_days    = "-".join(df_short["Completed days"  ].astype(str).unique())
+    start_time        = df_short["Time"].iloc[0]
+    end_time          = df_short["Time"].iloc[-1]
+    length_mins       = (end_time - start_time).total_seconds()*(1/60)
+    start_left_pokes  = df_short["Left Poke Count"].iloc[0]
+    end_left_pokes    = df_short["Left Poke Count"].iloc[-1]
+    num_left_pokes    = end_left_pokes - start_left_pokes
+    start_right_pokes = df_short["Right Poke Count"].iloc[0]
+    end_right_pokes   = df_short["Right Poke Count"].iloc[-1]
+    num_right_pokes   = end_right_pokes - start_right_pokes
+    total_pokes       = num_left_pokes + num_right_pokes
+    start_pellets     = df_short["Pellet Count"].iloc[0]
+    end_pellets       = df_short["Pellet Count"].iloc[-1]
+    pellet_count      = end_pellets - start_pellets
+    retrieval_times   = df_short["Retrieval Time"]
+    IPIs              = df_short["Interpellet Interval"]
+    poke_times        = df_short["Poke Time"]
+    sum_retrievals    = retrieval_times.sum()
+    sum_IPIs          = IPIs.sum()
+    sum_poke_times    = poke_times.sum()
+    avg_retrievals    = retrieval_times.mean()
+    avg_IPIs          = IPIs.mean()
+    avg_poke_times    = poke_times.mean()
+    
+    # Add these variables to the results dictionary.
+    results["Number of blocks"]               = blocks
+    results["Light/dark"]                     = lightdark
+    results["Days"]                           = days
+    results["Completed cycles"]               = completed_cycles
+    results["Completed days"]                 = completed_days
+    results["Start time"]                     = start_time
+    results["End time"]                       = end_time
+    results["Length (mins)"]                  = length_mins
+    results["Left poke count"]                = num_left_pokes
+    results["Right poke count"]               = num_right_pokes
+    results["Total pokes"]                    = total_pokes
+    results["Pellet count"]                   = pellet_count
+    results["Sum of retrieval times (secs)"]  = sum_retrievals
+    results["Sum of IPIs (secs)"]             = sum_IPIs
+    results["Sum of poke times (secs)"]       = sum_poke_times
+    results["Average retrieval times (secs)"] = avg_retrievals
+    results["Average IPIs (secs)"]            = avg_IPIs
+    results["Average poke times (secs)"]      = avg_poke_times
+    
+    return(results)
 
-def analyse_data(df, inputs, name):
+def generate_results_bandit1(df_short, results):
+    
+    # Collect statistics.
+    # Notice that "LeftinTimeOut" and "RightinTimeout" have slightly different capitals.
+    pellets_to_switch = "-".join(df_short["PelletsToSwitch"].astype(str).unique())
+    num_reversals     = df_short["Blocks"].unique().size - 1
+    pokes_dispense    = df_short["Event"].isin(["LeftDuringDispense", "RightDuringDispense"]).sum()
+    pokes_timeout     = df_short["Event"].isin(["LeftinTimeOut", "RightinTimeout"]).sum()
+    pokes_pellet      = df_short["Event"].isin(["LeftWithPellet", "RightWithPellet"]).sum()
+    
+    # Add these variables to the results dictionary.
+    results["Pellets to switch"]     = pellets_to_switch
+    results["Num reversals"]         = num_reversals
+    results["Pokes during dispense"] = pokes_dispense
+    results["Poke in timeout"]       = pokes_timeout
+    results["Pokes with pellet"]     = pokes_pellet
+    
+    return(results)
 
-    filename = inputs["Filename"]
-    numbers  = df[name].unique()
+def generate_results_bandit2(df_short, results):
+    
+    # Create a shortened dataframe called df_main that only includes the main 
+    # events left, right and pellet.
+    df_main = df_short[df_short["Event"].isin(["Left", "Right", "Pellet"])].copy()
+    df_main["Event after x1"] = df_main["Event"].shift(-1)
+    df_main["Event after x2"] = df_main["Event"].shift(-2)
+    
+    # Define helpful variables with df_main.
+    poke             = df_main["Event"].isin(["Left","Right"])
+    poke_afterx1     = df_main["Event after x1"].isin(["Left","Right"])
+    poke_afterx2     = df_main["Event after x2"].isin(["Left","Right"])
+    high_prob_poke   = df_main["Event"] == df_main["High prob poke"]
+    low_prob_poke    = df_main["Event"] == df_main["Low prob poke"]
+    pell_afterx1     = df_main["Event after x1"] == "Pellet"
+    same_event_x0_x1 = df_main["Event"] == df_main["Event after x1"]
+    same_event_x0_x2 = df_main["Event"] == df_main["Event after x2"]
+    
+    # Find the indices where specific events occur.
+    win                  = (poke           & pell_afterx1).sum()
+    high_prob_win        = (high_prob_poke & pell_afterx1).sum()
+    low_prob_win         = (low_prob_poke  & pell_afterx1).sum()
+    high_prob_win_stay   = (high_prob_poke & pell_afterx1 & poke_afterx2 &  same_event_x0_x2).sum()
+    high_prob_win_shift  = (high_prob_poke & pell_afterx1 & poke_afterx2 & ~same_event_x0_x2).sum()
+    low_prob_win_stay    = (low_prob_poke  & pell_afterx1 & poke_afterx2 &  same_event_x0_x2).sum()
+    low_prob_win_shift   = (low_prob_poke  & pell_afterx1 & poke_afterx2 & ~same_event_x0_x2).sum()
+    loss                 = (poke           & poke_afterx1).sum()
+    high_prob_loss       = (high_prob_poke & poke_afterx1).sum()
+    low_prob_loss        = (low_prob_poke  & poke_afterx1).sum()
+    high_prob_lose_stay  = (high_prob_poke & poke_afterx1 &  same_event_x0_x1).sum()
+    high_prob_lose_shift = (high_prob_poke & poke_afterx1 & ~same_event_x0_x1).sum()
+    low_prob_lose_stay   = (low_prob_poke  & poke_afterx1 &  same_event_x0_x1).sum()
+    low_prob_lose_shift  = (low_prob_poke  & poke_afterx1 & ~same_event_x0_x1).sum()
+    
+    # Add these results to the dataframe.
+    results["Win"]                  = win
+    results["High prob win"]        = high_prob_win
+    results["Low prob win"]         = low_prob_win
+    results["High prob win-stay"]   = high_prob_win_stay
+    results["High prob win-shift"]  = high_prob_win_shift
+    results["Low prob win-stay"]    = low_prob_win_stay
+    results["Low prob win-shift"]   = low_prob_win_shift
+    results["Loss"]                 = loss
+    results["High prob loss"]       = high_prob_loss
+    results["Low prob loss"]        = low_prob_loss
+    results["High prob lose-stay"]  = high_prob_lose_stay
+    results["High prob lose-shift"] = high_prob_lose_shift
+    results["Low prob lose-stay"]   = low_prob_lose_stay
+    results["Low prob lose-shift"]  = low_prob_lose_shift
+    
+    # Calculate percentages.
+    percentage1 = per(win,  win + loss)
+    percentage2 = per(loss, win + loss)
+    percentage3 = per(high_prob_win,  high_prob_win + high_prob_loss)
+    percentage4 = per(high_prob_loss, high_prob_win + high_prob_loss)
+    percentage5 = per(low_prob_win,   low_prob_win  + low_prob_loss)
+    percentage6 = per(low_prob_loss,  low_prob_win  + low_prob_loss)
+
+    # Add these percentages to the results.
+    results["Win/(win+loss) (%)"]                                  = percentage1
+    results["Loss/(win+loss) (%)"]                                 = percentage2
+    results["High prob win/(high prob win + high prob loss) (%)"]  = percentage3
+    results["High prob loss/(high prob win + high prob loss) (%)"] = percentage4
+    results["Low prob win/(low prob win + low prob loss) (%)"]     = percentage5
+    results["Low prob loss/(low prob win + low prob loss) (%)"]    = percentage6
+    
+    return(results)
+
+def generate_results_bandit(df_short, results, name):
+    
+    results = generate_results_closedecon(df_short, results, name)
+    results = generate_results_bandit1(df_short, results)
+    results = generate_results_bandit2(df_short, results)
+    
+    return(results)
+
+def analyse_data(df, inputs, name, generate_results):
+
     collated = []
     
-    for num in numbers:
-
-        # Initialise the variables.
-        start             = df.index[df[name] == num][0]
-        end               = df.index[df[name] == num][-1]
-        blocks            = get_block_stats(df.loc[start:end,"Blocks"], name)
-        lightdark         = get_other_stats(df.loc[start:end,"Light/Dark"])
-        days              = get_other_stats(df.loc[start:end,"Days"])
-        completed_cycles  = get_other_stats(df.loc[start:end,"Completed cycles"])
-        completed_days    = get_other_stats(df.loc[start:end,"Completed days"])
-        start_time        = df.at[start,"Time"]
-        end_time          = df.at[end,  "Time"]
-        length_mins       = (end_time - start_time).total_seconds()*(1/60)
-        start_left_pokes  = df.at[start,"Left Poke Count"]
-        end_left_pokes    = df.at[end,  "Left Poke Count"]
-        num_left_pokes    = end_left_pokes - start_left_pokes
-        start_right_pokes = df.at[start,"Right Poke Count"]
-        end_right_pokes   = df.at[end,  "Right Poke Count"]
-        num_right_pokes   = end_right_pokes - start_right_pokes
-        total_pokes       = num_left_pokes + num_right_pokes
-        start_pellets     = df.at[start,"Pellet Count"]
-        end_pellets       = df.at[end,  "Pellet Count"]
-        pellet_count      = end_pellets - start_pellets
-        retrieval_times   = df.loc[start:end,"Retrieval Time"]
-        IPIs              = df.loc[start:end,"Interpellet Interval"]
-        poke_times        = df.loc[start:end,"Poke Time"]
-        sum_retrievals    = retrieval_times.sum()
-        sum_IPIs          = IPIs.sum()
-        sum_poke_times    = poke_times.sum()
-        avg_retrievals    = retrieval_times.mean()
-        avg_IPIs          = IPIs.mean()
-        avg_poke_times    = poke_times.mean()
+    for num in df[name].unique():
         
-        # Add these variables to the results dictionary.
+        df_short = df[df[name] == num].copy()
         results = {}
-        results["Filename"]                       = filename
-        results["Number of blocks"]               = blocks
-        results["Light/dark"]                     = lightdark
-        results["Days"]                           = days
-        results["Completed cycles"]               = completed_cycles
-        results["Completed days"]                 = completed_days
-        results["Start time"]                     = start_time
-        results["End time"]                       = end_time
-        results["Length (mins)"]                  = length_mins
-        results["Left poke count"]                = num_left_pokes
-        results["Right poke count"]               = num_right_pokes
-        results["Total pokes"]                    = total_pokes
-        results["Pellet count"]                   = pellet_count
-        results["Sum of retrieval times (secs)"]  = sum_retrievals
-        results["Sum of IPIs (secs)"]             = sum_IPIs
-        results["Sum of poke times (secs)"]       = sum_poke_times
-        results["Average retrieval times (secs)"] = avg_retrievals
-        results["Average IPIs (secs)"]            = avg_IPIs
-        results["Average poke times (secs)"]      = avg_poke_times
+        results["Filename"] = inputs["Filename"]
+        results = generate_results(df_short, results, name)
         collated += [results]
     
     return(collated)
 
-def collect_data_subsets(df, inputs):
+def collect_data_subsets(df, inputs, generate_results):
     
-    # Perform the same analysis using "Blocks", "Cycles" and "Days".
-    closedecon = {}
+    dict1 = {}
+    
+    # Only include complete blocks for the blocks, cycles and days analysis.
+    df_compblocks = df[df["Completed blocks"] == "Y"]
     for name in ["Blocks","Cycles","Days"]:
-        closedecon[name] = analyse_data(df, inputs, name)
+        dict1[name] = analyse_data(df_compblocks, inputs, name, generate_results)
     
-    # For the analysis of whole animals, exclude the incomplete days.
-    df_compdays = df[df["Completed days"] == "Y"]
-    closedecon["Total"] = analyse_data(df_compdays, inputs, "Total")
+    # Only include complete blocks and days for the whole file analysis.
+    df_compblocksdays = df_compblocks[df_compblocks["Completed days"] == "Y"]
+    dict1["Total"] = analyse_data(df_compblocksdays, inputs, "Total", generate_results)
     
-    return(closedecon)
+    return(dict1)
 
 def analyse_FED_file(df, inputs):
     
     sheets     = {}
     stopsig    = {}
     closedecon = {}
+    bandit     = {}
+    plot_data  = {}
     
     # Find the time bins.
     sheets["Time bins"] = find_time_bins(df, inputs)
@@ -515,9 +665,18 @@ def analyse_FED_file(df, inputs):
         df = add_time_info(df, inputs)
         
         # Collect statistics grouped by blocks, cycles and days.
-        closedecon = collect_data_subsets(df, inputs)
+        closedecon = collect_data_subsets(df, inputs, generate_results_closedecon)
+    
+    if inputs["Session Type"] == "Bandit":
+        # Add block, light/dark cycle and day information as columns.
+        df = add_time_info(df, inputs)
+        df = add_bandit_info(df)
+        plot_data = plot_pokes_and_blocks(df, inputs)
+        
+        # Collect statistics grouped by blocks, cycles and days.
+        bandit = collect_data_subsets(df, inputs, generate_results_bandit)
     
     # Export the data.
     export_data(inputs, sheets)
         
-    return(sheets, stopsig, closedecon)
+    return(sheets, stopsig, closedecon, bandit, plot_data)

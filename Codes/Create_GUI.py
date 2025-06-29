@@ -6,11 +6,13 @@ import sys
 import yaml
 
 def import_yaml_file():
+    
     # Load the yaml file with the default values.
     script_dir = os.path.dirname(os.path.abspath(__file__))
     yaml_file = os.path.join(script_dir, "GUI_default_values.yaml")
     with open(yaml_file, "r") as file:
         default = yaml.safe_load(file)
+        
     return(default)
 
 def str_to_bool(value):
@@ -134,7 +136,7 @@ def choose_light_dark_cycle(inputs, default):
     
     return(inputs)    
 
-def import_settings_file(inputs, default):
+def choose_to_import_settings_file(inputs, default):
     
     sg.theme("DarkTeal2")
     layout = [
@@ -176,9 +178,14 @@ def choose_settings_file_location(inputs, default):
             file_path = values["Import"]
             window.close()
             break
-    gt_table = pd.read_excel(file_path, index_col=0)
-    gt_table = gt_table.fillna('')
     inputs['Settings import location'] = file_path
+    
+    return(inputs)
+
+def import_settings_file(inputs):
+    
+    gt_table = pd.read_excel(inputs['Settings import location'], index_col=0)
+    gt_table = gt_table.fillna('')
     inputs['Genotypes/treatments table'] = gt_table
     
     return(inputs)
@@ -257,21 +264,31 @@ def export_yaml_file(inputs, default):
     with open(yaml_file, "w") as file:
         yaml.dump(export, file, sort_keys=False, default_flow_style=False)
     
-def GUI():
-    
+def GUI(skip=False):
+
+    # Import the default settings from the GUI_default_values.yaml file.
     default = import_yaml_file()
+    
+    # Allow the user to run the codes with the default settings.
+    if skip and default["Use settings file"]:
+        inputs = import_settings_file(default)
+        return(inputs)
+
+    # Choose the basic information for FED analysis.
     inputs = basic_options(default)
     
-    if check_session_type(inputs) == 'ClosedEcon_PR1':
+    # If the light dark cycle information is needed, ask for this data.
+    if check_session_type(inputs) in ['ClosedEcon_PR1', "Bandit"]:
         inputs = choose_light_dark_cycle(inputs, default)
     
     # If find individual columns is true, ask whether to import an existing excle file.
-    if inputs['Find individual columns'] == True:
-        inputs = import_settings_file(inputs, default)
+    if inputs['Find individual columns']:
+        inputs = choose_to_import_settings_file(inputs, default)
             
         # If the previous option is true, ask for the import location.
-        if inputs['Use settings file'] == True:
+        if inputs['Use settings file']:
             inputs = choose_settings_file_location(inputs, default)
+            inputs = import_settings_file(inputs)
         
         # If the previous option is false, type in the genotypes/treatments.
         if inputs['Use settings file'] == False:

@@ -10,9 +10,12 @@ def create_blank_master():
                    '>Left_Stop_trial','LeftinTimeOut','NoPoke_Regular_(incorrect)',
                    'NoPoke_STOP_(correct)','Pellet','Right_no_left','Right_Regular_(correct)',
                    'RightDuringDispense','RightinTimeout']
+                   
     master = {}
+    
     for col in sheet_names:
         master[col] = pd.DataFrame()
+        
     return(master)
 
 def add_columns_to_master(master, df_bins, inputs):
@@ -23,7 +26,9 @@ def add_columns_to_master(master, df_bins, inputs):
                    '>Left_Stop_trial','LeftinTimeOut','NoPoke_Regular_(incorrect)',
                    'NoPoke_STOP_(correct)','Pellet','Right_no_left','Right_Regular_(correct)',
                    'RightDuringDispense','RightinTimeout']
+                   
     sheet_cols = [col for col in sheet_names if col in df_bins.columns]
+    
     for col in sheet_cols:
         master[col][inputs['Filename']] = df_bins[col]
         
@@ -91,24 +96,28 @@ def add_time_columns_to_master(master, inputs):
     # Remove the blank sheets.
     sheet_names = list(master.keys())
     for sheet in sheet_names:
-        if len(master[sheet]) == 0:
+        if len(master[sheet].columns) == 0:
             master.pop(sheet)
         
     return(master)
+
+def export_master_file(master, inputs):
+    
+    # Export the master file.
+    with pd.ExcelWriter(os.path.join(inputs['Export location'], 'Master.xlsx')) as writer:
+        for sheet in master.keys():
+            master[sheet].to_excel(writer, sheet_name=sheet)
 
 def create_master_file(master, inputs):
     
     master = add_genotypes_treatments_to_master(master, inputs)
     master = add_time_columns_to_master(master, inputs)
-    # Export the master file.
-    with pd.ExcelWriter(os.path.join(inputs['Export location'], 'Master.xlsx')) as writer:
-        for sheet in master.keys():
-            master[sheet].to_excel(writer, sheet_name=sheet)
+    export_master_file(master, inputs)
             
-def create_blank_stopsig_master():
+def create_blank_singletime_master():
     return([])
 
-def add_to_stopsig_master(stopsig_master, stopsig):
+def add_to_singletime_master(stopsig_master, stopsig):
     stopsig_master += [stopsig]
     return(stopsig_master)
             
@@ -134,15 +143,15 @@ def create_stopsig_master_file(stopsig_master, inputs):
     with pd.ExcelWriter(os.path.join(inputs['Export location'], 'StopSig_Master.xlsx')) as writer:
         stopsig_master.to_excel(writer)
 
-def create_blank_closedecon_master():
+def create_blank_multitime_master():
     return({"Blocks":[], "Cycles":[], "Days":[], "Total":[]})
 
-def add_to_closedecon_master(closedecon_master, closedecon):
+def add_to_multitime_master(closedecon_master, closedecon):
     for key in closedecon_master.keys():
         closedecon_master[key] += closedecon[key]
     return(closedecon_master)
 
-def create_closedecon_master_file(closedecon_master, inputs):
+def create_multitime_master_file(closedecon_master, inputs):
     
     gt_table = inputs['Genotypes/treatments table']
     def labels(filename, info):
@@ -181,7 +190,34 @@ def create_closedecon_master_file(closedecon_master, inputs):
     closedecon_master["Total"]  = closedecon_master["Total" ].drop(columns=total_drop)
     
     # Export the closedecon master file.
-    export_destination = os.path.join(inputs['Export location'], 'ClosedEcon_Master.xlsx')
+    export_name = f'{inputs["Session Type"]}_Master.xlsx'
+    export_destination = os.path.join(inputs['Export location'], export_name)
     with pd.ExcelWriter(export_destination) as writer:
         for sheet in closedecon_master.keys():
             closedecon_master[sheet].to_excel(writer, sheet_name=sheet, index=False)
+
+def create_blank_plot_data_master(inputs):
+    
+    # Export the settings as an excel file.
+    folder_name = 'Plots0'
+    i = 1
+    while folder_name in os.listdir(inputs['Export location']):
+        folder_name = folder_name[:-1] + str(i)
+        i += 1
+    export_destination = os.path.join(inputs['Export location'], folder_name)
+    os.makedirs(export_destination)
+    inputs["Plots location"] = export_destination
+    plot_data_master = []
+    
+    return(plot_data_master, inputs)
+
+def create_plot_data_master_file(plot_data_master, inputs):
+    
+    # Prepare data.
+    plot_data_master = pd.concat([pd.DataFrame(dict1) for dict1 in plot_data_master], axis=1)
+    plot_data_master = plot_data_master.sort_index(axis=1, level=[0, 1, 2, 3])
+    
+    # Export data.
+    export_name = "Bandit_plot_data.csv"
+    export_destination = os.path.join(inputs['Plots location'], export_name)
+    plot_data_master.to_csv(export_destination, index=False)
