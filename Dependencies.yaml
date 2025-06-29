@@ -10,3 +10,6 @@ dependencies:
     - numpy
     - pandas
     - openpyxl
+    - matplotlib
+    - jinja2
+    - pyyaml
