@@ -72,7 +72,7 @@ __Author:__ <br>
 [Harry Dempsey](https://github.com/H-Dempsey) (Andrews lab and Foldi lab) <br>
 
 __Credits:__ <br>
-Zane Andrews, Wang Lok So, Lex Kravitz <br>
+Zane Andrews, Wang Lok So, Lex Kravitz, Taaseen Rahman <br>
 
 __About the labs:__ <br>
 The [Andrews lab](https://www.monash.edu/discovery-institute/andrews-lab) investigates how the brain senses and responds to hunger. <br>
