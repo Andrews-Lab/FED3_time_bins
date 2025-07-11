@@ -369,6 +369,8 @@ def add_time_info(df, inputs):
     end   = pd.to_datetime(inputs["Light cycle end"]).time()
     df["Light/Dark"] = df["Time"].apply(identify_cycle, start=start, end=end)
     df["Cycles"] = (df["Light/Dark"] != df["Light/Dark"].shift()).cumsum()
+    if df.at[0,"Light/Dark"] == "Dark":
+        df["Cycles"] = df["Cycles"] - 1
     
     # Find the day numbers.
     # Subtract the time of the light cycle start from the Time column, so that
@@ -409,36 +411,36 @@ def add_bandit_info(df):
     return(df)
 
 def plot_pokes_and_blocks(df, inputs):
-
-    # Define important variables.
-    num_blocks = df["Blocks"].max()
-    full_name = [inputs['Filename'][:-4]]
     
-    # Add genotype and treatment information if it is there.
+    # Write the title.
+    full_name = [inputs['Filename'][:-4]]
     if inputs['Find individual columns']:        
         gt_table = inputs['Genotypes/treatments table']
         genotype, treatment, mouse_ID = gt_table.loc[inputs["Filename"]]
         full_name += [genotype, treatment, mouse_ID]
-    
+
     # Plot the data.
+    title = " ".join(full_name)
+    num_blocks = df["Blocks"].max()
     plt.figure(figsize=(num_blocks*(12/29), 4))
     plt.plot(range(len(df)), df["Ideal prop"], color="grey", label="Ideal proportion")
     plt.plot(range(len(df)), df["Cumul prop"], color="blue", label="Proportion")
-    plt.title(" ".join(full_name))
+    plt.title(title)
     plt.xlabel("Number of left, right or pellet trials")
     plt.ylabel("Left / (left + right) within each block")
     plt.legend(loc='lower right', bbox_to_anchor=(1, 1), ncol=2)
-    
+
     # Export the plot.
-    export_name = f'{"_".join(full_name)}.png'
+    safe_characters = [char if char.isalnum() else "_" for char in title]
+    export_name = f'{"".join(safe_characters)}.png'
     export_destination = os.path.join(inputs['Plots location'], export_name)
     plt.savefig(export_destination, bbox_inches="tight")
     plt.close()
 
     # Record the plotting data.
     plot_data = {
-        tuple(full_name + ["Proportion"]):       df["Cumul prop"].tolist(),
-        tuple(full_name + ["Ideal proportion"]): df["Ideal prop"].tolist()
+        (*full_name, "Proportion"):       df["Cumul prop"].tolist(),
+        (*full_name, "Ideal proportion"): df["Ideal prop"].tolist()
     }
     return(plot_data)
         
@@ -456,6 +458,7 @@ def generate_results_closedecon(df_short, results, name):
     # Initialise the variables.
     blocks            = get_block_stats(df_short["Blocks"], name)
     lightdark         = "-".join(df_short["Light/Dark"      ].astype(str).unique())
+    cycles            = "-".join(df_short["Cycles"          ].astype(str).unique())
     days              = "-".join(df_short["Days"            ].astype(str).unique())
     completed_cycles  = "-".join(df_short["Completed cycles"].astype(str).unique())
     completed_days    = "-".join(df_short["Completed days"  ].astype(str).unique())
@@ -485,6 +488,7 @@ def generate_results_closedecon(df_short, results, name):
     # Add these variables to the results dictionary.
     results["Number of blocks"]               = blocks
     results["Light/dark"]                     = lightdark
+    results["Cycles"]                         = cycles
     results["Days"]                           = days
     results["Completed cycles"]               = completed_cycles
     results["Completed days"]                 = completed_days
@@ -582,12 +586,16 @@ def generate_results_bandit2(df_short, results):
     percentage6 = per(low_prob_loss,  low_prob_win  + low_prob_loss)
 
     # Add these percentages to the results.
-    results["Win/(win+loss) (%)"]                                  = percentage1
-    results["Loss/(win+loss) (%)"]                                 = percentage2
-    results["High prob win/(high prob win + high prob loss) (%)"]  = percentage3
-    results["High prob loss/(high prob win + high prob loss) (%)"] = percentage4
-    results["Low prob win/(low prob win + low prob loss) (%)"]     = percentage5
-    results["Low prob loss/(low prob win + low prob loss) (%)"]    = percentage6
+    results["Win/(win+loss) (%)"]             = percentage1
+    results["Loss/(win+loss) (%)"]            = percentage2
+    results["HP win/(HP win + HP loss) (%)"]  = percentage3
+    results["HP loss/(HP win + HP loss) (%)"] = percentage4
+    results["LP win/(LP win + LP loss) (%)"]  = percentage5
+    results["LP loss/(LP win + LP loss) (%)"] = percentage6
+    # results["High prob win/(high prob win + high prob loss) (%)"]  = percentage3
+    # results["High prob loss/(high prob win + high prob loss) (%)"] = percentage4
+    # results["Low prob win/(low prob win + low prob loss) (%)"]     = percentage5
+    # results["Low prob loss/(low prob win + low prob loss) (%)"]    = percentage6
     
     return(results)
 

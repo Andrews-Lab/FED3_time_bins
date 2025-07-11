@@ -1,4 +1,5 @@
 from Preprocess_data import import_data, clean_data, correct_session_type_columns
+from Create_concatenator import run_concatenator_gui
 import pandas as pd
 import os
 import PySimpleGUI as sg
@@ -53,7 +54,7 @@ def basic_options(default):
                      sg.Combo(["True", "False"],
                               default_value=str(default['Find individual columns']),
                               key="Find_Ind_Cols",enable_events=True)],
-        [sg.T("")], [sg.Button("Submit")]
+        [sg.T("")], [sg.Button("Submit"), sg.Push(), sg.Button("Concatenate files")]
              ]
     window = sg.Window('Options for analysis', layout, finalize=True)
     
@@ -81,6 +82,8 @@ def basic_options(default):
             window.Element("End_Time").Update(visible=False)
         if values["End_Time_Type"] == 'Use custom time':
             window.Element("End_Time").Update(visible=True)
+        if event == "Concatenate files":
+            run_concatenator_gui()
         # If submit is pressed, record the entries in the GUI.
         if event == "Submit":
             inputs['Import location']         = values["Import"]
@@ -185,7 +188,7 @@ def choose_settings_file_location(inputs, default):
 def import_settings_file(inputs):
     
     gt_table = pd.read_excel(inputs['Settings import location'], index_col=0)
-    gt_table = gt_table.fillna('')
+    gt_table = gt_table.fillna('').astype(str).replace("\n","")
     inputs['Genotypes/treatments table'] = gt_table
     
     return(inputs)
@@ -227,6 +230,7 @@ def create_settings_file(inputs):
                 gt_table.at[filename,name3] = values[filename+'_Name3']
             window.close()
             break    
+    gt_table = gt_table.astype(str).replace("\n","")
     inputs['Genotypes/treatments table'] = gt_table
     
     return(inputs)

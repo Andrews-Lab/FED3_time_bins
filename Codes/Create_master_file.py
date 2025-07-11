@@ -152,8 +152,9 @@ def add_to_multitime_master(closedecon_master, closedecon):
     return(closedecon_master)
 
 def create_multitime_master_file(closedecon_master, inputs):
-    
+
     gt_table = inputs['Genotypes/treatments table']
+    id_info  = [gt_table.index.name] + gt_table.columns.tolist()
     def labels(filename, info):
         return(gt_table.at[filename, info])
     
@@ -180,21 +181,55 @@ def create_multitime_master_file(closedecon_master, inputs):
     closedecon_master["Blocks"] = closedecon_master["Blocks"].rename(columns=renamed)
 
     # Drop columns.
-    blocks_drop = ["Completed cycles", "Completed days"]
+    blocks_drop = ["Completed cycles", "Completed days", "Cycles"]
     cycles_drop = ["Completed days"]
-    days_drop   = ["Completed cycles"]
-    total_drop  = ["Completed cycles", "Completed days", "Light/dark"]
+    days_drop   = ["Completed cycles", "Cycles"]
+    total_drop  = ["Completed cycles", "Completed days", "Light/dark", "Cycles"]
     closedecon_master["Blocks"] = closedecon_master["Blocks"].drop(columns=blocks_drop)
     closedecon_master["Cycles"] = closedecon_master["Cycles"].drop(columns=cycles_drop)
     closedecon_master["Days"]   = closedecon_master["Days"  ].drop(columns=days_drop)
     closedecon_master["Total"]  = closedecon_master["Total" ].drop(columns=total_drop)
-    
+
     # Export the closedecon master file.
     export_name = f'{inputs["Session Type"]}_Master.xlsx'
     export_destination = os.path.join(inputs['Export location'], export_name)
     with pd.ExcelWriter(export_destination) as writer:
         for sheet in closedecon_master.keys():
             closedecon_master[sheet].to_excel(writer, sheet_name=sheet, index=False)
+
+    # Convert columns from string to numeric values.
+    closedecon_master["Cycles"]["Cycles"] = pd.to_numeric(closedecon_master["Cycles"]["Cycles"])
+    closedecon_master["Days"]["Days"]     = pd.to_numeric(closedecon_master["Days"]["Days"])
+    closedecon_master["Total"]["Total"]   = "Animal"
+    
+    # Export a closedecon master file for each time scale with sheets for each
+    # data column.
+    # for sheet in ["Blocks", "Cycles", "Days", "Total"]:
+    for sheet in ["Days"]:
+        
+        excel = {}
+   
+        df_sheet = closedecon_master[sheet].copy()
+        if sheet == "Days":
+            df_sheet = df_sheet[df_sheet["Completed days"] == "Y"]
+        
+        # Create a new excel sheet for each data column.
+        col_ind   = df_sheet.columns.get_loc("Left poke count")
+        data_cols = df_sheet.columns[col_ind:]
+        heading   = {"Blocks":"Block numbers", "Cycles":["Cycles", "Light/dark"], 
+            "Days":"Days", "Total":"Total"}
+        for col in data_cols:
+            excel[col] = df_sheet.pivot(index=heading[sheet], columns=id_info, values=col)
+            excel[col].index.name = col
+        
+        # Export this excel file.
+        name = "Completed_Days" if sheet == "Days" else sheet
+        export_name = f'{inputs["Session Type"]}_Master_{name}.xlsx'
+        export_destination = os.path.join(inputs['Export location'], export_name)
+        with pd.ExcelWriter(export_destination) as writer:
+            for sheet in excel.keys():
+                safe_name = sheet.replace("/","÷")
+                excel[sheet].to_excel(writer, sheet_name=safe_name, index=True)
 
 def create_blank_plot_data_master(inputs):
     
@@ -215,7 +250,7 @@ def create_plot_data_master_file(plot_data_master, inputs):
     
     # Prepare data.
     plot_data_master = pd.concat([pd.DataFrame(dict1) for dict1 in plot_data_master], axis=1)
-    plot_data_master = plot_data_master.sort_index(axis=1, level=[0, 1, 2, 3])
+    plot_data_master = plot_data_master.sort_index(axis=1, level=[0,1,2,3])
     
     # Export data.
     export_name = "Bandit_plot_data.csv"
