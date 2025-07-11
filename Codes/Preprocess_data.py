@@ -112,7 +112,7 @@ def correct_session_type_columns(df, inputs):
             
     return(df, inputs)
 
-def combine_time_columns(df):
+def combine_time_columns(df, inputs):
     
     # Combine time columns if there are 2.
     if "MM:DD:YYYYhh:mm:ss" not in df.columns:
@@ -130,7 +130,12 @@ def combine_time_columns(df):
     
     # Convert the values to the datetime format.
     df["Time"] = pd.to_datetime(df["Time"])
-    
+
+    # Check that the time column is monotonically increasing.
+    if df["Time"].is_monotonic_increasing == False:
+        print(f'\nThe time column for {inputs["Filename"]} decreases at some point.')
+        sys.exit()
+
     return(df)
 
 def find_date(time):
@@ -236,7 +241,7 @@ def preprocess_data(inputs):
     df, inputs = correct_session_type_columns(df, inputs)
     
     # Combine time columns if there are 2.
-    df = combine_time_columns(df)
+    df = combine_time_columns(df, inputs)
     
     # Edit the start and end times.
     inputs = edit_start_and_end_times(df, inputs)
