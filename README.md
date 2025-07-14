@@ -68,8 +68,8 @@ View the guide about [how to analyse your FED data](How_to_use_FED_code.pdf).
 
 ### Acknowledgements
 
-__Author:__ <br>
-[Harry Dempsey](https://github.com/H-Dempsey) (Andrews lab and Foldi lab) <br>
+__Authors:__ <br>
+[Harry Dempsey](https://github.com/H-Dempsey), Taaseen Rahman <br>
 
 __Credits:__ <br>
 Zane Andrews, Wang Lok So, Lex Kravitz, Taaseen Rahman <br>
