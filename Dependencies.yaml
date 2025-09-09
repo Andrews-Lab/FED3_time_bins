@@ -1,8 +1,10 @@
 name: FED3_time_bins
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - python=3.7
+  - PySimpleGUI
   - pip
   - pip:
     - tqdm
