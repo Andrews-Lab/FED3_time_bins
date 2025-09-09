@@ -218,28 +218,13 @@ def create_settings_file(inputs):
                   sg.Input(size=size2, key=filename+'_Name3', expand_x=True)]]
 
     # Scrollable column so huge file lists are usable
-    scrollable_col = sg.Column(
-        rows,
-        scrollable=True,
-        vertical_scroll_only=True,
-        size=(900, 600),    # starting size; adjust as you like
-        expand_x=True,
-        expand_y=True
-    )
-
-    layout = [
-        [scrollable_col],
-        [sg.Push(), sg.Button("Submit", bind_return_key=True)]
-    ]
+    scrollable_col = sg.Column(rows, scrollable=True, vertical_scroll_only=True,
+                               size=(900, 600), expand_x=True, expand_y=True)
+    layout = [[scrollable_col], [sg.Push(), sg.Button("Submit", bind_return_key=True)]]
 
     # Resizable + draggable window
-    window = sg.Window(
-        'Fill in the genotypes/treatments',
-        layout,
-        resizable=True,
-        finalize=True,
-        grab_anywhere=True
-    )
+    window = sg.Window('Fill in the genotypes/treatments', layout,resizable=True,
+                       finalize=True, grab_anywhere=True)
 
     while True:
         event, values = window.read()
@@ -337,3 +322,4 @@ def GUI(skip=False):
     export_yaml_file(inputs, default)
             
     return(inputs)
+
