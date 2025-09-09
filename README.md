@@ -49,6 +49,25 @@ Activate the environment. <br>
 ```
 conda activate FTB
 ```
+
+### Usage
+Open Anaconda Prompt (on Mac open terminal). <br>
+Change the directory to the place where the git clone was made.
+```
+cd FED3_time_bins
+```
+
+Activate the conda environment.
+```
+conda activate FTB
+```
+
+Run the codes.
+```
+python FED.py
+```
+
+### Troubleshooting
 If you encounter errors about missing packages, you can install them manually. For example, the project requires PySimpleGUI v4.60.5 (the newer v5.x versions may cause licensing or attribute errors). Install it using the line below. <br>
 ```
 conda install -c conda-forge pysimplegui=4.60.5
@@ -72,22 +91,6 @@ conda deactivate
 conda remove --name FTB --all
 conda env create -n FTB -f Dependencies.yaml
 conda activate FTB
-```
-### Usage
-Open Anaconda Prompt (on Mac open terminal). <br>
-Change the directory to the place where the git clone was made.
-```
-cd FED3_time_bins
-```
-
-Activate the conda environment.
-```
-conda activate FTB
-```
-
-Run the codes.
-```
-python FED.py
 ```
 
 ### Guide
