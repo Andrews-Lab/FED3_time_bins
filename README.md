@@ -25,22 +25,29 @@ __Input and output data__
 
 Install [Anaconda Navigator](https://www.anaconda.com/products/distribution). <br>
 Open Anaconda Prompt (on Mac open terminal and install X-Code when prompted). <br>
-Download this repository to your home directory by typing in the line below.
+Download this repository to your home directory by typing in the line below. <br>
 ```
 git clone https://github.com/Andrews-Lab/FED3_time_bins.git
 ```
-If you receive an error about git, install git using the line below, type "Y" when prompted and then re-run the line above.
+If you receive an error about git, install git using the line below, type "Y" when prompted and then re-run the line above. <br>
 ```
 conda install -c anaconda git
+```
+Verify that Git was installed correctly: <br>
+```
+git --version
 ```
 Change the directory to the place where the downloaded folder is. <br>
 ```
 cd FED3_time_bins
 ```
-
-Create a conda environment and install the dependencies.
+Create a conda environment and install the dependencies. <br>
 ```
 conda env create -n FTB -f Dependencies.yaml
+```
+Activate the environment. <br>
+```
+conda activate FTB
 ```
 
 ### Usage
@@ -58,6 +65,32 @@ conda activate FTB
 Run the codes.
 ```
 python FED.py
+```
+
+### Troubleshooting
+If you encounter errors about missing packages, you can install them manually. For example, the project requires PySimpleGUI v4.60.5 (the newer v5.x versions may cause licensing or attribute errors). Install it using the line below. <br>
+```
+conda install -c conda-forge pysimplegui=4.60.5
+```
+Verify that PySimpleGUI installed correctly: <br>
+```
+python -c "import PySimpleGUI as sg; print(sg.version)"
+```
+You should see: `4.60.5` <br>
+If you see errors about other missing modules (e.g. PyYAML), you can install them using the lines below. <br>
+```
+conda install -c conda-forge pyyaml
+```
+or <br>
+```
+pip install pyyaml
+```
+If your environment becomes corrupted, you can delete and recreate it using the lines below. <br>
+```
+conda deactivate
+conda remove --name FTB --all
+conda env create -n FTB -f Dependencies.yaml
+conda activate FTB
 ```
 
 ### Guide
