@@ -56,7 +56,8 @@ def basic_options(default):
                               key="Find_Ind_Cols",enable_events=True)],
         [sg.T("")], [sg.Button("Submit"), sg.Push(), sg.Button("Concatenate files")]
              ]
-    window = sg.Window('Options for analysis', layout, finalize=True)
+    # Resizable window (handy for long paths)
+    window = sg.Window('Options for analysis', layout, finalize=True, resizable=True)
     
     # Intialise the prompt visibility.
     if default["Start time type"] in ["Use first timestamp","Use initiation poke"]:
@@ -201,35 +202,52 @@ def create_settings_file(inputs):
     sg.theme("DarkTeal2")
     size1 = (30,1)
     size2 = (20,1)
-    layout = [[sg.T("")], [sg.Text('Filename', size=size1), 
-                           sg.Input(default_text="Genotype",  key="Name1", size=size2),
-                           sg.Input(default_text="Treatment", key="Name2", size=size2),
-                           sg.Input(default_text="Mouse ID",  key="Name3", size=size2)]]
+
+    # Header row with EDITABLE titles (as before)
+    rows = [[sg.T("")],
+            [sg.Text('Filename', size=size1),
+             sg.Input(default_text="Genotype",  key="Name1", size=size2, expand_x=True),
+             sg.Input(default_text="Treatment", key="Name2", size=size2, expand_x=True),
+             sg.Input(default_text="Mouse ID",  key="Name3", size=size2, expand_x=True)]]
+
+    # One row per file
     for filename in import_files:
-        layout += [[sg.Text(filename, size=size1), 
-                    sg.Input(size=size2, key=filename+'_Name1'),
-                    sg.Input(size=size2, key=filename+'_Name2'),
-                    sg.Input(size=size2, key=filename+'_Name3')]]
-    layout += [[sg.T("")], [sg.Button("Submit")]]
-    window = sg.Window('Fill in the genotypes/treatments', layout)
+        rows += [[sg.Text(filename, size=size1, tooltip=filename),
+                  sg.Input(size=size2, key=filename+'_Name1', expand_x=True),
+                  sg.Input(size=size2, key=filename+'_Name2', expand_x=True),
+                  sg.Input(size=size2, key=filename+'_Name3', expand_x=True)]]
+
+    # Scrollable column so huge file lists are usable
+    scrollable_col = sg.Column(rows, scrollable=True, vertical_scroll_only=True,
+                               size=(900, 600), expand_x=True, expand_y=True)
+    layout = [[scrollable_col], [sg.Push(), sg.Button("Submit", bind_return_key=True)]]
+
+    # Resizable + draggable window
+    window = sg.Window('Fill in the genotypes/treatments', layout,resizable=True,
+                       finalize=True, grab_anywhere=True)
+
     while True:
         event, values = window.read()
         if event == sg.WIN_CLOSED or event=="Exit":
             window.close()
             sys.exit()
         elif event == "Submit":
+            # READ the customizable column titles from the header inputs
             name1 = values["Name1"]
             name2 = values["Name2"]
             name3 = values["Name3"]
+
             gt_table = pd.DataFrame(columns=[name1,name2,name3],
                                     index=import_files)
             gt_table.index.name = 'Filename'
+
             for filename in import_files:
-                gt_table.at[filename,name1] = values[filename+'_Name1']
-                gt_table.at[filename,name2] = values[filename+'_Name2']
-                gt_table.at[filename,name3] = values[filename+'_Name3']
+                gt_table.at[filename,name1] = values.get(filename+'_Name1', '')
+                gt_table.at[filename,name2] = values.get(filename+'_Name2', '')
+                gt_table.at[filename,name3] = values.get(filename+'_Name3', '')
             window.close()
             break    
+
     gt_table = gt_table.astype(str).replace("\n","")
     inputs['Genotypes/treatments table'] = gt_table
     
@@ -304,3 +322,4 @@ def GUI(skip=False):
     export_yaml_file(inputs, default)
             
     return(inputs)
+
