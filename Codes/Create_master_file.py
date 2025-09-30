@@ -144,92 +144,170 @@ def create_stopsig_master_file(stopsig_master, inputs):
         stopsig_master.to_excel(writer)
 
 def create_blank_multitime_master():
-    return({"Blocks":[], "Cycles":[], "Days":[], "Total":[]})
+    return({})
 
 def add_to_multitime_master(closedecon_master, closedecon):
-    for key in closedecon_master.keys():
+    for key in closedecon.keys():
+        if key not in closedecon_master.keys():
+            closedecon_master[key] = []
         closedecon_master[key] += closedecon[key]
     return(closedecon_master)
 
-def create_multitime_master_file(closedecon_master, inputs):
+def labels(filename, info, gt_table):
+    return(gt_table.at[filename, info])
 
-    gt_table = inputs['Genotypes/treatments table']
-    id_info  = [gt_table.index.name] + gt_table.columns.tolist()
-    def labels(filename, info):
-        return(gt_table.at[filename, info])
+def organise_table1(df_sheet, sheet, inputs):
     
     # Convert the list of dicts to a dataframe.
-    for sheet in closedecon_master.keys():
-        closedecon_master[sheet] = pd.DataFrame(closedecon_master[sheet]).T
-        closedecon_master[sheet].columns = closedecon_master[sheet].iloc[0]
-        closedecon_master[sheet] = closedecon_master[sheet].drop("Filename")
+    df_sheet = pd.DataFrame(df_sheet).T
+    df_sheet.columns = df_sheet.iloc[0]
+    df_sheet = df_sheet.drop("Filename")
 
-        # Add the genotypes and treatments to the columns and sort them by these headings.
-        headers = pd.Series(closedecon_master[sheet].columns, index=closedecon_master[sheet].columns)
-        for name in gt_table.columns:
-            table = headers.apply(labels, info=name).to_frame().T
-            table.index = [name]
-            closedecon_master[sheet] = pd.concat([table, closedecon_master[sheet]])
-        closedecon_master[sheet] = closedecon_master[sheet].sort_values(by=list(gt_table.columns), axis=1)
-        
-        # Rotate the table in contrast to previous master files.
-        closedecon_master[sheet] = closedecon_master[sheet].T
-        closedecon_master[sheet].insert(3,"Filename",closedecon_master[sheet].index)
-
-    # Rename columns.
-    renamed = {"Number of blocks":"Block numbers"}
-    closedecon_master["Blocks"] = closedecon_master["Blocks"].rename(columns=renamed)
-
-    # Drop columns.
-    blocks_drop = ["Completed cycles", "Completed days", "Cycles"]
-    cycles_drop = ["Completed days"]
-    days_drop   = ["Completed cycles", "Cycles"]
-    total_drop  = ["Completed cycles", "Completed days", "Light/dark", "Cycles"]
-    closedecon_master["Blocks"] = closedecon_master["Blocks"].drop(columns=blocks_drop)
-    closedecon_master["Cycles"] = closedecon_master["Cycles"].drop(columns=cycles_drop)
-    closedecon_master["Days"]   = closedecon_master["Days"  ].drop(columns=days_drop)
-    closedecon_master["Total"]  = closedecon_master["Total" ].drop(columns=total_drop)
-
-    # Export the closedecon master file.
-    export_name = f'{inputs["Session Type"]}_Master.xlsx'
-    export_destination = os.path.join(inputs['Export location'], export_name)
-    with pd.ExcelWriter(export_destination) as writer:
-        for sheet in closedecon_master.keys():
-            closedecon_master[sheet].to_excel(writer, sheet_name=sheet, index=False)
-
-    # Convert columns from string to numeric values.
-    closedecon_master["Cycles"]["Cycles"] = pd.to_numeric(closedecon_master["Cycles"]["Cycles"])
-    closedecon_master["Days"]["Days"]     = pd.to_numeric(closedecon_master["Days"]["Days"])
-    closedecon_master["Total"]["Total"]   = "Animal"
+    # Add the genotypes and treatments to the columns and sort them by these headings.
+    headers = pd.Series(df_sheet.columns, index=df_sheet.columns)
+    gt_table = inputs['Genotypes/treatments table']
+    for name in gt_table.columns:
+        table = headers.apply(labels, info=name, gt_table=gt_table).to_frame().T
+        table.index = [name]
+        df_sheet = pd.concat([table, df_sheet])
+    df_sheet = df_sheet.sort_values(by=list(gt_table.columns), axis=1)
     
-    # Export a closedecon master file for each time scale with sheets for each
-    # data column.
-    # for sheet in ["Blocks", "Cycles", "Days", "Total"]:
-    for sheet in ["Days"]:
-        
-        excel = {}
-   
-        df_sheet = closedecon_master[sheet].copy()
-        if sheet == "Days":
-            df_sheet = df_sheet[df_sheet["Completed days"] == "Y"]
-        
-        # Create a new excel sheet for each data column.
-        col_ind   = df_sheet.columns.get_loc("Left poke count")
-        data_cols = df_sheet.columns[col_ind:]
-        heading   = {"Blocks":"Block numbers", "Cycles":["Cycles", "Light/dark"], 
-            "Days":"Days", "Total":"Total"}
-        for col in data_cols:
-            excel[col] = df_sheet.pivot(index=heading[sheet], columns=id_info, values=col)
-            excel[col].index.name = col
-        
-        # Export this excel file.
-        name = "Completed_Days" if sheet == "Days" else sheet
+    # Rotate the table in contrast to previous master files.
+    df_sheet = df_sheet.T
+    df_sheet.insert(3,"Filename",df_sheet.index)
+    
+    # List the columns to drop and rename.
+    drop_cols = {
+        "BLOCKS": ["Completed cycles", "Completed days", "Cycles"],
+        "CYCLES": ["Completed days"],
+        "DAYS":   ["Completed cycles", "Cycles"],
+        "TOTAL":  ["Completed cycles", "Completed days", "Light/Dark", "Cycles"],
+    }
+    rename_cols = {
+        "BLOCKS": {"Number of blocks":"Block numbers"},
+        "CYCLES": {},
+        "DAYS":   {},
+        "TOTAL":  {},
+    }
+    # Rename and drop columns according to the data type.
+    data_type = [type1 for type1 in drop_cols.keys() if type1 in sheet][0]
+    df_sheet  = df_sheet.drop(columns=drop_cols[data_type])
+    df_sheet  = df_sheet.rename(columns=rename_cols[data_type])
+    
+    return(df_sheet)
+
+def organise_table2(df_sheet, sheet, inputs):
+    
+    # Define the row indices.
+    index_cols = {
+        "BLOCKS": "Block numbers",
+        "CYCLES": ["Cycles", "Light/Dark"],
+        "DAYS":   "Days",
+        "TOTAL":  "Total",
+    }
+    # Reset the counting so that blocks, cycles and days go like 0,1,1,2,...
+    df_sheet    = df_sheet.copy()
+    data_type   = [type1 for type1 in index_cols.keys() if type1 in sheet][0]
+    heading     = index_cols[data_type]
+    num_heading = heading[0] if type(heading)==list else heading
+    df_sheet[num_heading] = pd.factorize(df_sheet[num_heading])[0] + 1
+
+    # Make a new excel sheet for each data column.
+    col_ind      = df_sheet.columns.get_loc("Left poke count")
+    list_heading = [heading] if type(heading)==str else heading
+    data_cols    = df_sheet.columns[col_ind:].tolist() + list_heading
+    gt_table     = inputs['Genotypes/treatments table']
+    id_info      = [gt_table.index.name] + gt_table.columns.tolist()
+    
+    # Define row index name.
+    if "Light" in sheet:
+        extra_word = "Light "
+    elif "Dark" in sheet:
+        extra_word = "Dark "
+    else:
+        extra_word = ""
+    if type(heading)==list:
+        index_name = heading
+    else:
+        index_name = [extra_word + heading]
+    
+    # Create a new excel sheet for every data column.
+    excel = {}
+    for col in data_cols:
+        excel[col] = df_sheet.pivot(index=heading, columns=id_info, values=col)
+        excel[col].index.names = index_name
+
+    # If no color coding is needed, skip this step.
+    days_or_total = "DAYS" in sheet or "TOTAL" in sheet
+    light_or_dark = "Light" in sheet or "Dark" in sheet
+    if days_or_total or light_or_dark:
+        return(excel)
+
+    # Deine a color map.
+    color_map = {
+        "Light": "",
+        "Light-Dark": "background-color: #FCE5CD",
+        "Dark-Light": "background-color: #FCE5CD",
+        "Dark": "background-color: #D3D3D3",
+    }
+    # For every sheet in the excel file, apply coloring rules.
+    color_code = df_sheet.pivot(index=heading, columns=id_info, values="Light/Dark")
+    styles = color_code.applymap(lambda x: color_map[x])
+    for col in excel.keys():
+        excel[col] = excel[col].style.apply(lambda x: styles, axis=None)
+
+    return(excel)
+
+def export_multitime(master, inputs, name):
+    
+    # Define export destination for excel file.
+    if type(name)==list:
+        export_name = f'{inputs["Session Type"]}_Master.xlsx'
+        keep_index = False
+        keep_sheets = name
+    else:
         export_name = f'{inputs["Session Type"]}_Master_{name}.xlsx'
-        export_destination = os.path.join(inputs['Export location'], export_name)
-        with pd.ExcelWriter(export_destination) as writer:
-            for sheet in excel.keys():
-                safe_name = sheet.replace("/","÷")
-                excel[sheet].to_excel(writer, sheet_name=safe_name, index=True)
+        keep_index = True
+        keep_sheets = master.keys()
+    export_destination = os.path.join(inputs['Export location'], export_name)
+    
+    # Export excel file.
+    with pd.ExcelWriter(export_destination) as writer:
+        for sheet in keep_sheets:
+            safe_name = sheet.replace("/","÷")
+            master[sheet].to_excel(writer, sheet_name=safe_name, index=keep_index)
+      
+def create_multitime_master_file(master1, inputs):
+    
+    for sheet in master1.keys():
+        master1[sheet] = organise_table1(master1[sheet], sheet, inputs)
+    
+    # Sheets to appear in the Master_Bandit.xlsx or Master_ClosedEcon.xlsx file.
+    keep_sheets = [
+        "Comp_Blocks_BLOCKS",              
+        "Comp_Blocks_CYCLES",              
+        "Comp_Blocks_DAYS",                       
+        "Comp_Blocks_Days_TOTAL",     
+        "Comp_Blocks_Days_Light_TOTAL",
+        "Comp_Blocks_Days_Dark_TOTAL",
+        "Comp_Blocks_Cycles_Light_TOTAL",
+        "Comp_Blocks_Cycles_Dark_TOTAL",
+    ]
+    export_multitime(master1, inputs, keep_sheets)
+    
+    # File to export as Master_Bandit_{file}.xlsx or Master_ClosedEcon_{file}.xlsx.
+    keep_files = [              
+        "Comp_Blocks_Days_DAYS",
+        "Comp_Blocks_Days_BLOCKS",
+        "Comp_Blocks_Days_Light_BLOCKS",
+        "Comp_Blocks_Days_Dark_BLOCKS",
+        "Comp_Blocks_Cycles_CYCLES",
+        "Comp_Blocks_Cycles_Light_CYCLES",
+        "Comp_Blocks_Cycles_Dark_CYCLES",
+    ]
+    for file in keep_files:
+        master2 = organise_table2(master1[file], file, inputs)
+        export_multitime(master2, inputs, file)
 
 def create_blank_plot_data_master(inputs):
     

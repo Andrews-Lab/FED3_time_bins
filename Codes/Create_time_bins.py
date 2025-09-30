@@ -487,7 +487,7 @@ def generate_results_closedecon(df_short, results, name):
     
     # Add these variables to the results dictionary.
     results["Number of blocks"]               = blocks
-    results["Light/dark"]                     = lightdark
+    results["Light/Dark"]                     = lightdark
     results["Cycles"]                         = cycles
     results["Days"]                           = days
     results["Completed cycles"]               = completed_cycles
@@ -532,8 +532,11 @@ def generate_results_bandit2(df_short, results):
     # Create a shortened dataframe called df_main that only includes the main 
     # events left, right and pellet.
     df_main = df_short[df_short["Event"].isin(["Left", "Right", "Pellet"])].copy()
-    df_main["Event after x1"] = df_main["Event"].shift(-1)
-    df_main["Event after x2"] = df_main["Event"].shift(-2)
+    df_main["Event after x1"]      = df_main["Event"].shift(-1)
+    df_main["Event after x2"]      = df_main["Event"].shift(-2)
+    df_main["Event no jump"]       = df_main.index.to_series().diff() == 1
+    df_main["Event no jump x1"]    = df_main["Event no jump"].shift(-1)
+    df_main["Event no jump x2"]    = df_main["Event no jump"].shift(-2)
     
     # Define helpful variables with df_main.
     poke             = df_main["Event"].isin(["Left","Right"])
@@ -544,22 +547,25 @@ def generate_results_bandit2(df_short, results):
     pell_afterx1     = df_main["Event after x1"] == "Pellet"
     same_event_x0_x1 = df_main["Event"] == df_main["Event after x1"]
     same_event_x0_x2 = df_main["Event"] == df_main["Event after x2"]
+    no_jump_x0_x1    = df_main["Event no jump x1"]
+    no_jump_x1_x2    = df_main["Event no jump x2"]
+    no_jump_x0tx2    = no_jump_x0_x1 & no_jump_x1_x2
     
     # Find the indices where specific events occur.
-    win                  = (poke           & pell_afterx1).sum()
-    high_prob_win        = (high_prob_poke & pell_afterx1).sum()
-    low_prob_win         = (low_prob_poke  & pell_afterx1).sum()
-    high_prob_win_stay   = (high_prob_poke & pell_afterx1 & poke_afterx2 &  same_event_x0_x2).sum()
-    high_prob_win_shift  = (high_prob_poke & pell_afterx1 & poke_afterx2 & ~same_event_x0_x2).sum()
-    low_prob_win_stay    = (low_prob_poke  & pell_afterx1 & poke_afterx2 &  same_event_x0_x2).sum()
-    low_prob_win_shift   = (low_prob_poke  & pell_afterx1 & poke_afterx2 & ~same_event_x0_x2).sum()
-    loss                 = (poke           & poke_afterx1).sum()
-    high_prob_loss       = (high_prob_poke & poke_afterx1).sum()
-    low_prob_loss        = (low_prob_poke  & poke_afterx1).sum()
-    high_prob_lose_stay  = (high_prob_poke & poke_afterx1 &  same_event_x0_x1).sum()
-    high_prob_lose_shift = (high_prob_poke & poke_afterx1 & ~same_event_x0_x1).sum()
-    low_prob_lose_stay   = (low_prob_poke  & poke_afterx1 &  same_event_x0_x1).sum()
-    low_prob_lose_shift  = (low_prob_poke  & poke_afterx1 & ~same_event_x0_x1).sum()
+    win                  = (poke           & pell_afterx1 & no_jump_x0_x1).sum()
+    high_prob_win        = (high_prob_poke & pell_afterx1 & no_jump_x0_x1).sum()
+    low_prob_win         = (low_prob_poke  & pell_afterx1 & no_jump_x0_x1).sum()
+    high_prob_win_stay   = (high_prob_poke & pell_afterx1 & poke_afterx2 &  same_event_x0_x2 & no_jump_x0tx2).sum()
+    high_prob_win_shift  = (high_prob_poke & pell_afterx1 & poke_afterx2 & ~same_event_x0_x2 & no_jump_x0tx2).sum()
+    low_prob_win_stay    = (low_prob_poke  & pell_afterx1 & poke_afterx2 &  same_event_x0_x2 & no_jump_x0tx2).sum()
+    low_prob_win_shift   = (low_prob_poke  & pell_afterx1 & poke_afterx2 & ~same_event_x0_x2 & no_jump_x0tx2).sum()
+    loss                 = (poke           & poke_afterx1 & no_jump_x0_x1).sum()
+    high_prob_loss       = (high_prob_poke & poke_afterx1 & no_jump_x0_x1).sum()
+    low_prob_loss        = (low_prob_poke  & poke_afterx1 & no_jump_x0_x1).sum()
+    high_prob_lose_stay  = (high_prob_poke & poke_afterx1 &  same_event_x0_x1 & no_jump_x0_x1).sum()
+    high_prob_lose_shift = (high_prob_poke & poke_afterx1 & ~same_event_x0_x1 & no_jump_x0_x1).sum()
+    low_prob_lose_stay   = (low_prob_poke  & poke_afterx1 &  same_event_x0_x1 & no_jump_x0_x1).sum()
+    low_prob_lose_shift  = (low_prob_poke  & poke_afterx1 & ~same_event_x0_x1 & no_jump_x0_x1).sum()
     
     # Add these results to the dataframe.
     results["Win"]                  = win
@@ -625,14 +631,42 @@ def collect_data_subsets(df, inputs, generate_results):
     
     dict1 = {}
     
-    # Only include complete blocks for the blocks, cycles and days analysis.
-    df_compblocks = df[df["Completed blocks"] == "Y"]
-    for name in ["Blocks","Cycles","Days"]:
-        dict1[name] = analyse_data(df_compblocks, inputs, name, generate_results)
+    # Define ways to subset the data.
+    complete_blocks = df["Completed blocks"] == "Y"
+    complete_cycles = df["Completed cycles"] == "Y"
+    complete_days   = df["Completed days"]   == "Y"
+    light_cycles    = df["Light/Dark"]       == "Light"
+    dark_cycles     = df["Light/Dark"]       == "Dark"
     
-    # Only include complete blocks and days for the whole file analysis.
-    df_compblocksdays = df_compblocks[df_compblocks["Completed days"] == "Y"]
-    dict1["Total"] = analyse_data(df_compblocksdays, inputs, "Total", generate_results)
+    # Create data subsets.
+    df_compblocks            = df[complete_blocks]
+    df_compblocksdays        = df[complete_blocks & complete_days]
+    df_compblocksdayslight   = df[complete_blocks & complete_days   & light_cycles]
+    df_compblocksdaysdark    = df[complete_blocks & complete_days   & dark_cycles]
+    df_compblockscycles      = df[complete_blocks & complete_cycles]
+    df_compblockscycleslight = df[complete_blocks & complete_cycles & light_cycles]
+    df_compblockscyclesdark  = df[complete_blocks & complete_cycles & dark_cycles]
+    
+    # Create info for analysing data subsets.
+    info = [
+        ("Comp_Blocks_BLOCKS",              df_compblocks,            "Blocks"),
+        ("Comp_Blocks_CYCLES",              df_compblocks,            "Cycles"),
+        ("Comp_Blocks_DAYS",                df_compblocks,            "Days"),
+        ("Comp_Blocks_Days_BLOCKS",         df_compblocksdays,        "Blocks"),
+        ("Comp_Blocks_Days_CYCLES",         df_compblocksdays,        "Cycles"),
+        ("Comp_Blocks_Days_DAYS",           df_compblocksdays,        "Days"),
+        ("Comp_Blocks_Days_TOTAL",          df_compblocksdays,        "Total"),
+        ("Comp_Blocks_Days_Light_BLOCKS",   df_compblocksdayslight,   "Blocks"),
+        ("Comp_Blocks_Days_Dark_BLOCKS",    df_compblocksdaysdark,    "Blocks"),
+        ("Comp_Blocks_Cycles_CYCLES",       df_compblockscycles,      "Cycles"),
+        ("Comp_Blocks_Cycles_Light_CYCLES", df_compblockscycleslight, "Cycles"),
+        ("Comp_Blocks_Cycles_Dark_CYCLES",  df_compblockscyclesdark,  "Cycles"),
+        ("Comp_Blocks_Days_Light_TOTAL",    df_compblocksdayslight,   "Total"),
+        ("Comp_Blocks_Days_Dark_TOTAL",     df_compblocksdaysdark,    "Total"),
+        ("Comp_Blocks_Cycles_Light_TOTAL",  df_compblockscycleslight, "Total"),
+        ("Comp_Blocks_Cycles_Dark_TOTAL",   df_compblockscyclesdark,  "Total"),
+    ]
+    dict1 = {val[0]: analyse_data(val[1], inputs, val[2], generate_results) for val in info}
     
     return(dict1)
 
