@@ -529,14 +529,18 @@ def generate_results_bandit1(df_short, results):
 
 def generate_results_bandit2(df_short, results):
     
-    # Create a shortened dataframe called df_main that only includes the main 
-    # events left, right and pellet.
-    df_main = df_short[df_short["Event"].isin(["Left", "Right", "Pellet"])].copy()
-    df_main["Event after x1"]      = df_main["Event"].shift(-1)
-    df_main["Event after x2"]      = df_main["Event"].shift(-2)
-    df_main["Event no jump"]       = df_main.index.to_series().diff() == 1
-    df_main["Event no jump x1"]    = df_main["Event no jump"].shift(-1)
-    df_main["Event no jump x2"]    = df_main["Event no jump"].shift(-2)
+    # Record times when there are jumps between events.
+    df_main = df_short.copy()
+    df_main["Event no jump"]    = df_main.index.to_series().diff() == 1
+    df_main["Event no jump x1"] = df_main["Event no jump"].shift(-1)
+    df_main["Event no jump x2"] = df_main["Event no jump"].shift(-2)
+    
+    # Only keep the rows for events "Left", "Right" and "Pellet".
+    df_main = df_main[df_main["Event"].isin(["Left", "Right", "Pellet"])].copy()
+    
+    # Record events that happen in later rows.
+    df_main["Event after x1"] = df_main["Event"].shift(-1)
+    df_main["Event after x2"] = df_main["Event"].shift(-2)
     
     # Define helpful variables with df_main.
     poke             = df_main["Event"].isin(["Left","Right"])
