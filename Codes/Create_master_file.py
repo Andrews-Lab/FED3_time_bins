@@ -198,22 +198,26 @@ def organise_table1(df_sheet, sheet, inputs):
 
 def organise_table2(df_sheet, sheet, inputs):
     
-    # Define the row indices.
+    # Find the time data column that we will re-index.
     index_cols = {
         "BLOCKS": "Block numbers",
         "CYCLES": ["Cycles", "Light/Dark"],
         "DAYS":   "Days",
         "TOTAL":  "Total",
     }
-    # Reset the counting so that blocks, cycles and days go like 0,1,1,2,...
-    df_sheet    = df_sheet.copy()
-    data_type   = [type1 for type1 in index_cols.keys() if type1 in sheet][0]
-    heading     = index_cols[data_type]
-    num_heading = heading[0] if type(heading)==list else heading
-    df_sheet[num_heading] = pd.factorize(df_sheet[num_heading])[0] + 1
+    data_type    = [type1 for type1 in index_cols.keys() if type1 in sheet][0]
+    heading      = index_cols[data_type]
+    num_heading  = heading[0] if type(heading)==list else heading
+    
+    # Reset the counting so that blocks, cycles and days data is transformed from
+    # 0,1,1,3,4,0,3,4,... into 0,1,1,2,3,0,1,2,...
+    df_sheet              = df_sheet.copy()
+    df_sheet[num_heading] = pd.to_numeric(df_sheet[num_heading])
+    count_groups          = (df_sheet[num_heading].diff() < 0).cumsum()
+    df_sheet[num_heading] = df_sheet.groupby(count_groups)[num_heading].rank(method="dense").astype(int)
 
     # Make a new excel sheet for each data column.
-    col_ind      = df_sheet.columns.get_loc("Left poke count")
+    col_ind      = df_sheet.columns.get_loc("Length (mins)")
     list_heading = [heading] if type(heading)==str else heading
     data_cols    = df_sheet.columns[col_ind:].tolist() + list_heading
     gt_table     = inputs['Genotypes/treatments table']
@@ -245,6 +249,7 @@ def organise_table2(df_sheet, sheet, inputs):
 
     # Deine a color map.
     color_map = {
+        "nan": "",
         "Light": "",
         "Light-Dark": "background-color: #FCE5CD",
         "Dark-Light": "background-color: #FCE5CD",
@@ -252,6 +257,7 @@ def organise_table2(df_sheet, sheet, inputs):
     }
     # For every sheet in the excel file, apply coloring rules.
     color_code = df_sheet.pivot(index=heading, columns=id_info, values="Light/Dark")
+    color_code = color_code.fillna("nan")
     styles = color_code.applymap(lambda x: color_map[x])
     for col in excel.keys():
         excel[col] = excel[col].style.apply(lambda x: styles, axis=None)

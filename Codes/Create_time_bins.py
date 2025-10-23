@@ -354,15 +354,21 @@ def return_y_or_n(val, list1):
     else:
         return("N")
 
+def counts_to_events(counts):
+    
+    # Convert cumulative data to event data, for example:
+    # (1,1,2,2,3,3,...) to (1,0,1,0,1,0,...) and
+    # (0,0,1,1,2,2,...) to (0,0,1,0,1,0,...).
+    events = counts.diff()
+    events.iloc[0] = counts.iloc[0] # diff makes nan the first value by default.
+    
+    return(events)
+
 def add_time_info(df, inputs):
     
     # Find the block numbers using the moments that the block pellet count goes
     # down such as 0,1,2,3,0,...
     df["Blocks"] = (df["Block Pellet Count"].diff() < 0).cumsum() + 1
-    one_high_prob_poke_per_block = df.groupby("Blocks")["High prob poke"].nunique().eq(1).all()
-    if one_high_prob_poke_per_block == False:
-        print("There is more than 1 high prob poke within a block")
-        sys.exit()
 
     # Find the cycle names.
     start = pd.to_datetime(inputs["Light cycle start"]).time()
@@ -395,9 +401,21 @@ def add_time_info(df, inputs):
     df["Completed cycles"] =  df["Cycles"].apply(return_y_or_n, list1=first_and_last_cycles)
     df["Completed days"]   =  df["Days"  ].apply(return_y_or_n, list1=first_and_last_days)
     
+    # Add left poke, right poke and pellet event data, as this is currently
+    # cumulative.
+    df["Left Poke Events"]  = counts_to_events(df["Left Poke Count"])
+    df["Right Poke Events"] = counts_to_events(df["Right Poke Count"])
+    df["Pellet Events"]     = counts_to_events(df["Pellet Count"])
+    
     return(df)
 
 def add_bandit_info(df):
+    
+    # Check that there is only 1 high prob poke within a block.
+    one_high_prob_poke_per_block = df.groupby("Blocks")["High prob poke"].nunique().eq(1).all()
+    if one_high_prob_poke_per_block == False:
+        print("There is more than 1 high prob poke within a block")
+        sys.exit()
     
     # Add statistics for the plotting.
     df["Low prob poke"] = df["High prob poke"].map({"Left":"Right","Right":"Left"})
@@ -465,16 +483,10 @@ def generate_results_closedecon(df_short, results, name):
     start_time        = df_short["Time"].iloc[0]
     end_time          = df_short["Time"].iloc[-1]
     length_mins       = (end_time - start_time).total_seconds()*(1/60)
-    start_left_pokes  = df_short["Left Poke Count"].iloc[0]
-    end_left_pokes    = df_short["Left Poke Count"].iloc[-1]
-    num_left_pokes    = end_left_pokes - start_left_pokes
-    start_right_pokes = df_short["Right Poke Count"].iloc[0]
-    end_right_pokes   = df_short["Right Poke Count"].iloc[-1]
-    num_right_pokes   = end_right_pokes - start_right_pokes
+    num_left_pokes    = df_short["Left Poke Events"].sum()
+    num_right_pokes   = df_short["Right Poke Events"].sum()
+    pellet_count      = df_short["Pellet Events"].sum()
     total_pokes       = num_left_pokes + num_right_pokes
-    start_pellets     = df_short["Pellet Count"].iloc[0]
-    end_pellets       = df_short["Pellet Count"].iloc[-1]
-    pellet_count      = end_pellets - start_pellets
     retrieval_times   = df_short["Retrieval Time"]
     IPIs              = df_short["Interpellet Interval"]
     poke_times        = df_short["Poke Time"]
@@ -602,10 +614,6 @@ def generate_results_bandit2(df_short, results):
     results["HP loss/(HP win + HP loss) (%)"] = percentage4
     results["LP win/(LP win + LP loss) (%)"]  = percentage5
     results["LP loss/(LP win + LP loss) (%)"] = percentage6
-    # results["High prob win/(high prob win + high prob loss) (%)"]  = percentage3
-    # results["High prob loss/(high prob win + high prob loss) (%)"] = percentage4
-    # results["Low prob win/(low prob win + low prob loss) (%)"]     = percentage5
-    # results["Low prob loss/(low prob win + low prob loss) (%)"]    = percentage6
     
     return(results)
 
