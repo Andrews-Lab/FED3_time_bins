@@ -300,7 +300,7 @@ def GUI(skip=False):
     inputs = basic_options(default)
     
     # If the light dark cycle information is needed, ask for this data.
-    if check_session_type(inputs) in ['ClosedEcon_PR1', "Bandit"]:
+    if check_session_type(inputs) in ["ClosedEcon_PR1", "Bandit", "StopSig"]:
         inputs = choose_light_dark_cycle(inputs, default)
     
     # If find individual columns is true, ask whether to import an existing excle file.

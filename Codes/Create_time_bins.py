@@ -144,178 +144,174 @@ def add_additional_columns(sheets, inputs):
         reordered[name] = add_additional_columns_to_sheet(sheets[name], inputs)
     return(reordered)
 
-def collect_paired_events_data(df):
-    
-    df["Latencies"] = np.nan
-
-    # Paired events analysis
-    PE = {} 
-    PE["Regular LRP count"]      = 0
-    PE["Regular LRP indices"]    = []
-    PE["Regular LRP latency LR"] = []
-    PE["Regular LRP latency RP"] = []
-    PE["Regular LN count"]       = 0
-    PE["Regular LN indices"]     = []
-    PE["Stop LNP count"]         = 0
-    PE["Stop LNP indices"]       = []
-    PE["Stop LNP latency NP"]    = []
-    PE["Stop LR count"]          = 0
-    PE["Stop LR indices"]        = []
-    PE["Stop LR latency LR"]     = []
-    
-    # Collect the paired events data.
-    for i in range(1,len(df)):
-        
-        if df.at[i-1,"Event"] == ">Left_Regular_trial" and df.at[i,"Event"] == "Right_Regular_(correct)":
-            for j in range(i,len(df)):
-                if df.at[j,"Event"] == "Pellet":
-                    latency_LR = (df.at[i,"Time"] - df.at[i-1,"Time"]).total_seconds()
-                    latency_RP = (df.at[j,"Time"] - df.at[i,  "Time"]).total_seconds()
-                    PE["Regular LRP count"]      += 1
-                    PE["Regular LRP indices"]    += list(range(i-1,j+1))
-                    PE["Regular LRP latency LR"] += [latency_LR]
-                    PE["Regular LRP latency RP"] += [latency_RP]
-                    df.at[i,"Latencies"] = latency_LR
-                    df.at[j,"Latencies"] = latency_RP
-                    break
-            
-        if df.at[i-1,"Event"] == ">Left_Regular_trial" and df.at[i,"Event"] == "NoPoke_Regular_(incorrect)":
-            PE["Regular LN count"]   += 1
-            PE["Regular LN indices"] += [i-1,i]
-            
-        if df.at[i-1,"Event"] == ">Left_Stop_trial" and df.at[i,"Event"] == "NoPoke_STOP_(correct)":
-            for j in range(i,len(df)):
-                if df.at[j,"Event"] == "Pellet":
-                    latency_NP = (df.at[j,"Time"] - df.at[i,"Time"]).total_seconds()
-                    PE["Stop LNP count"]      += 1
-                    PE["Stop LNP indices"]    += list(range(i-1,j+1))
-                    PE["Stop LNP latency NP"] += [latency_NP]
-                    df.at[j,"Latencies"] = latency_NP
-                    break
-            
-        if df.at[i-1,"Event"] == ">Left_Stop_trial" and df.at[i,"Event"] == "Right_STOP_(incorrect)":
-            latency_LR = (df.at[i,"Time"] - df.at[i-1,"Time"]).total_seconds()
-            PE["Stop LR count"]      += 1
-            PE["Stop LR indices"]    += [i-1,i]
-            PE["Stop LR latency LR"] += [latency_LR]
-            df.at[i,"Latencies"]      = latency_LR
-    
-    return(df, PE)
-
-def avg(list1):
-    if len(list1) == 0:
-        return(np.nan)
-    else:
-        return(sum(list1)/len(list1))
-
 def per(val1, val2):
     if val2 == 0:
         return(np.nan)
     else:
         return((val1/val2)*100)
 
-def organise_paired_events_results(PE, inputs):
+def generate_results_stopsig1(df_short, results):
     
+    # Record times when there are jumps between events.
+    df_short = df_short.copy()
+    df_short["Event no jump"]    = df_short.index.to_series().diff() == 1
+    df_short["Event no jump x1"] = df_short["Event no jump"].shift(-1)
+    df_short["Event no jump x2"] = df_short["Event no jump"].shift(-2)
+    
+    # Keep only events we want to analyse.
+    key_events = [
+        ">Left_Regular_trial",
+        ">Left_Stop_trial",
+        "Right_Regular_(correct)",
+        "Right_STOP_(incorrect)",
+        "NoPoke_Regular_(incorrect)",
+        "NoPoke_STOP_(correct)",
+        "Pellet",
+    ]
+    df_short = df_short[df_short["Event"].isin(key_events)].copy()
+    
+    # Define key variables.
+    event                          = df_short["Event"]
+    left_regular                   = event == ">Left_Regular_trial"
+    left_stop                      = event == ">Left_Stop_trial"
+    event_after                    = event.shift(-1)
+    right_regular_correct_after    = event_after == "Right_Regular_(correct)"
+    right_stop_incorrect_after     = event_after == "Right_STOP_(incorrect)"
+    nopoke_regular_incorrect_after = event_after == "NoPoke_Regular_(incorrect)"
+    nopoke_stop_correct_after      = event_after == "NoPoke_STOP_(correct)"
+    pellet                         = event == "Pellet"
+    pellet_after_x2                = pellet.shift(-2)
+    time                           = df_short["Time"]
+    time_diff                      = time - time.shift(1)
+    no_jump_x0_x1                  = df_short["Event no jump x1"]
+    no_jump_x1_x2                  = df_short["Event no jump x2"]
+    no_jump_x0tx2                  = no_jump_x0_x1 & no_jump_x1_x2
+    
+    # Create masks for each sequence type defined at the L position.
+    regular_LRP_L = left_regular & right_regular_correct_after & pellet_after_x2 & no_jump_x0tx2
+    regular_LN_L  = left_regular & nopoke_regular_incorrect_after                & no_jump_x0tx2
+    stop_LNP_L    = left_stop    & nopoke_stop_correct_after   & pellet_after_x2 & no_jump_x0tx2
+    stop_LR_L     = left_stop    & right_stop_incorrect_after                    & no_jump_x0tx2
+    
+    # Create masks for each sequence type defined at the R/N position.
+    regular_LRP_R = regular_LRP_L.shift(1, fill_value=False)
+    regular_LN_N  = regular_LN_L .shift(1, fill_value=False)
+    stop_LNP_N    = stop_LNP_L   .shift(1, fill_value=False)
+    stop_LR_R     = stop_LR_L    .shift(1, fill_value=False)
+    
+    # Create masks for each sequence type defined at the P position.
+    regular_LRP_P = regular_LRP_L.shift(2, fill_value=False)
+    stop_LNP_P    = stop_LNP_L   .shift(2, fill_value=False)
+
+    # Create color coding info.
+    masks = {
+        "regular_LRP": (regular_LRP_L, regular_LRP_P),
+        "regular_LN":  (regular_LN_L, regular_LN_N),
+        "stop_LNP":    (stop_LNP_L, stop_LNP_P),
+        "stop_LR":     (stop_LR_L, stop_LR_R),
+    }
+    # Calculate latency data.
+    regular_LRP_latency_LR = time_diff.dt.total_seconds().where(regular_LRP_R)
+    regular_LRP_latency_RP = time_diff.dt.total_seconds().where(regular_LRP_P)
+    stop_LNP_latency_NP    = time_diff.dt.total_seconds().where(stop_LNP_P)
+    stop_LR_latency_LR     = time_diff.dt.total_seconds().where(stop_LR_R)
+    
+    # Construct a latency column.
+    latencies = [
+        regular_LRP_latency_LR,
+        regular_LRP_latency_RP,
+        stop_LNP_latency_NP,
+        stop_LR_latency_LR,
+    ]
+    # Calculate statistics for each event type.
+    regular_LRP_count = regular_LRP_L.sum()
+    regular_LN_count  = regular_LN_L.sum()
+    total_regular     = regular_LRP_count + regular_LN_count
+    stop_LNP_count    = stop_LNP_L.sum()
+    stop_LR_count     = stop_LR_L.sum()
+    total_stop        = stop_LNP_count + stop_LR_count
+    total_events      = total_regular + total_stop
+
+    # Record the results into a dictionary.
+    results["Regular LRP count"]                 = regular_LRP_count
+    results["Regular LRP latency LR sum (secs)"] = regular_LRP_latency_LR.sum()
+    results["Regular LRP latency LR avg (secs)"] = regular_LRP_latency_LR.mean()
+    results["Regular LRP latency RP sum (secs)"] = regular_LRP_latency_RP.sum()
+    results["Regular LRP latency RP avg (secs)"] = regular_LRP_latency_RP.mean()
+    results["Regular LN count"]                  = regular_LN_count
+    results["Stop LNP count"]                    = stop_LNP_count
+    results["Stop LNP latency NP sum (secs)"]    = stop_LNP_latency_NP.sum()
+    results["Stop LNP latency NP avg (secs)"]    = stop_LNP_latency_NP.mean()
+    results["Stop LR count"]                     = stop_LR_count
+    results["Stop LR latency LR sum (secs)"]     = stop_LR_latency_LR.sum()
+    results["Stop LR latency LR avg (secs)"]     = stop_LR_latency_LR.mean()
+    results["Regular LRP/total regular (%)"]     = per(regular_LRP_count, total_regular)
+    results["Regular LN/total regular (%)"]      = per(regular_LN_count, total_regular)
+    results["Total regular events"]              = total_regular
+    results["Stop LNP/total stop (%)"]           = per(stop_LNP_count, total_stop)
+    results["Stop LR/total stop (%)"]            = per(stop_LR_count, total_stop)
+    results["Total stop events"]                 = total_stop
+    results["Regular LRP/total events (%)"]      = per(regular_LRP_count, total_events)
+    results["Regular LN/total events (%)"]       = per(regular_LN_count, total_events)
+    results["Regular events/total events (%)"]   = per(total_regular, total_events)
+    results["Stop LNP/total events (%)"]         = per(stop_LNP_count, total_events)
+    results["Stop LR/total events (%)"]          = per(stop_LR_count, total_events)
+    results["Stop events/total events (%)"]      = per(total_stop, total_events)
+    results["Total events"]                      = total_events
+    
+    return(results, masks, latencies) 
+    
+def prepare_stopsig_sheet(df_short, results, masks, latencies):
+    
+    # Record the latency data.
+    df_main = df_short[["Time", "Event"]].copy()
+    latencies = pd.concat(latencies, axis=1).bfill(axis=1).iloc[:, 0]
+    df_main["Latencies"] = latencies.reindex(df_main.index)
+
+    # Record the color coding info.
+    styles = {
+        "none":        "background-color: transparent; color: black",
+        "regular_LRP": "background-color: #00B050; color: white",
+        "regular_LN":  "background-color: #FF3F3F; color: white",
+        "stop_LNP":    "background-color: #C3EFCC; color: #4E7C3E",
+        "stop_LR":     "background-color: #FBC4CD; color: #9C1B14",
+    }
+    df_main["Colors"] = styles["none"]
+    
+    for name, (mask1, mask2) in masks.items():
+        starts, ends = mask1.index[mask1], mask2.index[mask2]
+        
+        for start, end in zip(starts, ends):
+            df_main.loc[start:end, "Colors"] = styles[name]
+
+    # Add some blank rows.
+    blank_row_indices = [5,6,9,12,18,29]
+    rows = list(results.items())[1:] # Remove the row saying "Filename: ..."
+    blank = (None, None)
+    for i in reversed(blank_row_indices):
+        rows.insert(i, blank)
+
+    # Prepare paired events analysis for concatenation with the raw data.
+    df_results = pd.DataFrame(rows, columns=["Time", "Event"])
+    df_results["Latencies"] = np.nan
+    df_results["Colors"] = styles["none"]
+    df_results.index = [f"results{i}" for i in df_results.index]
+    
+    # Concatenate the paired events analysis and raw data and apply styling.
+    sheet = pd.concat([df_results, df_main])
+    colors = sheet.pop("Colors")
+    styled_sheet = sheet.style.apply(lambda col: colors, subset=["Event"])
+
+    return(styled_sheet)
+
+def combine_results_and_raw_data(df, inputs):
+    
+    # Get stopsig results.
+    df_short = df.copy()
     results = {}
     results["Filename"] = inputs["Filename"]
-    
-    # Regular LRP
-    results["Regular LRP count"]                 = PE["Regular LRP count"]
-    results["Regular LRP latency LR sum (secs)"] = sum(PE["Regular LRP latency LR"])
-    results["Regular LRP latency LR avg (secs)"] = avg(PE["Regular LRP latency LR"])
-    results["Regular LRP latency RP sum (secs)"] = sum(PE["Regular LRP latency RP"])
-    results["Regular LRP latency RP avg (secs)"] = avg(PE["Regular LRP latency RP"])
-    results[" "*1] = np.nan
-        
-    # Regular LN
-    results["Regular LN count"]                  = PE["Regular LN count"]
-    results[" "*2] = np.nan
-    
-    # Stop LNP
-    results["Stop LNP count"]                    = PE["Stop LNP count"]
-    results["Stop LNP latency NP sum (secs)"]    = sum(PE["Stop LNP latency NP"])
-    results["Stop LNP latency NP avg (secs)"]    = avg(PE["Stop LNP latency NP"])
-    results[" "*3] = np.nan
-    
-    # Stop LR
-    results["Stop LR count"]                     = PE["Stop LR count"]
-    results["Stop LR latency LR sum (secs)"]     = sum(PE["Stop LR latency LR"])
-    results["Stop LR latency LR avg (secs)"]     = avg(PE["Stop LR latency LR"])
-    results[" "*4] = np.nan
-    
-    # Total events variables
-    regular_LRP   = PE["Regular LRP count"]
-    regular_LN    = PE["Regular LN count"]
-    total_regular = regular_LRP + regular_LN
-    stop_LNP      = PE["Stop LNP count"]
-    stop_LR       = PE["Stop LR count"]
-    total_stop    = stop_LNP + stop_LR
-    total_events  = total_regular + total_stop
-    
-    # Events within regular or stop trials.
-    results["Regular LRP/total regular (%)"]   = per(regular_LRP, total_regular)
-    results["Regular LN/total regular (%)"]    = per(regular_LN, total_regular)
-    results["Total regular events"]            = total_regular
-    results["Stop LNP/total stop (%)"]         = per(stop_LNP, total_stop)
-    results["Stop LR/total stop (%)"]          = per(stop_LR, total_stop)
-    results["Total stop events"]               = total_stop
-    results[" "*5] = np.nan
-    
-    # Events within total trials.
-    results["Regular LRP/total events (%)"]    = per(regular_LRP, total_events)
-    results["Regular LN/total events (%)"]     = per(regular_LN, total_events)
-    results["Regular events/total events (%)"] = per(total_regular, total_events)
-    results["Stop LNP/total events (%)"]       = per(stop_LNP, total_events)
-    results["Stop LR/total events (%)"]        = per(stop_LR, total_events)
-    results["Stop events/total events (%)"]    = per(total_stop, total_events)
-    results["Total events"]                    = total_events
-    results[" "*6] = np.nan
-    
-    return(results)
-
-def color(col, PE):
-    
-    colors = []
-    
-    for idx in col.index:
-        
-        if idx in PE["Regular LRP indices"]:
-            tcolor = '#FFFFFF' # White
-            bcolor = '#00B050' # Green
-
-        elif idx in PE["Regular LN indices"]:
-            tcolor = '#FFFFFF' # White
-            bcolor = '#FF3F3F' # Red
-            
-        elif idx in PE["Stop LNP indices"]:
-            tcolor = '#4E7C3E' # Dark green
-            bcolor = '#C3EFCC' # Light green
-            
-        elif idx in PE["Stop LR indices"]:
-            tcolor = '#9C1B14' # Dark red
-            bcolor = '#FBC4CD' # Light red
-            
-        else:
-            tcolor = 'black'
-            bcolor = 'none'
-            
-        colors += [f'background-color: {bcolor}; color: {tcolor}']
-        
-    return(colors)
-
-def combine_results_and_raw_data(df, results, PE):
-
-    # Prepare paired events analysis for concatenation.
-    results = pd.DataFrame(results.items(), columns=['Time', 'Event'])
-    results['Latencies'] = np.nan
-    results.index   = ["num"+str(i) for i in results.index]
-    
-    # Concatenate the paired events overall analysis and raw data.
-    sheet = pd.concat([results, df[["Time","Event","Latencies"]]])
-    sheet = sheet.iloc[1:] # Remove the row saying "Filename: ..."
-    
-    # Color code the sheet.
-    sheet = sheet.style.apply(color, PE=PE, subset=["Event"], axis=0)
+    results, masks, latencies = generate_results_stopsig1(df_short, results)
+    sheet = prepare_stopsig_sheet(df_short, results, masks, latencies)
 
     return(sheet)
 
@@ -356,9 +352,12 @@ def return_y_or_n(val, list1):
 
 def counts_to_events(counts):
     
-    # Convert cumulative data to event data, for example:
-    # (1,1,2,2,3,3,...) to (1,0,1,0,1,0,...) and
-    # (0,0,1,1,2,2,...) to (0,0,1,0,1,0,...).
+    # Transform a numeric series, so that every positive increase is quantified.
+    # 
+    # Examples:
+    # 1,1,2,2,3,3,4,4 -> 1,0,1,0,1,0,1,0
+    # 0,0,1,1,2,2,4,4 -> 0,0,1,0,1,0,2,0
+    # 
     events = counts.diff()
     events.iloc[0] = counts.iloc[0] # diff makes nan the first value by default.
     
@@ -520,6 +519,13 @@ def generate_results_closedecon(df_short, results, name):
     
     return(results)
 
+def generate_results_stopsig(df_short, results, name):
+    
+    results = generate_results_closedecon(df_short, results, name)
+    results, _, _, = generate_results_stopsig1(df_short, results)
+    
+    return(results)
+
 def generate_results_bandit1(df_short, results):
     
     # Collect statistics.
@@ -639,48 +645,84 @@ def analyse_data(df, inputs, name, generate_results):
     
     return(collated)
 
-def collect_data_subsets(df, inputs, generate_results):
-    
-    dict1 = {}
-    
-    # Define ways to subset the data.
-    complete_blocks = df["Completed blocks"] == "Y"
-    complete_cycles = df["Completed cycles"] == "Y"
-    complete_days   = df["Completed days"]   == "Y"
-    light_cycles    = df["Light/Dark"]       == "Light"
-    dark_cycles     = df["Light/Dark"]       == "Dark"
-    
-    # Create data subsets.
-    df_compblocks            = df[complete_blocks]
-    df_compblocksdays        = df[complete_blocks & complete_days]
-    df_compblocksdayslight   = df[complete_blocks & complete_days   & light_cycles]
-    df_compblocksdaysdark    = df[complete_blocks & complete_days   & dark_cycles]
-    df_compblockscycles      = df[complete_blocks & complete_cycles]
-    df_compblockscycleslight = df[complete_blocks & complete_cycles & light_cycles]
-    df_compblockscyclesdark  = df[complete_blocks & complete_cycles & dark_cycles]
-    
-    # Create info for analysing data subsets.
-    info = [
-        ("Comp_Blocks_BLOCKS",              df_compblocks,            "Blocks"),
-        ("Comp_Blocks_CYCLES",              df_compblocks,            "Cycles"),
-        ("Comp_Blocks_DAYS",                df_compblocks,            "Days"),
-        ("Comp_Blocks_Days_BLOCKS",         df_compblocksdays,        "Blocks"),
-        ("Comp_Blocks_Days_CYCLES",         df_compblocksdays,        "Cycles"),
-        ("Comp_Blocks_Days_DAYS",           df_compblocksdays,        "Days"),
-        ("Comp_Blocks_Days_TOTAL",          df_compblocksdays,        "Total"),
-        ("Comp_Blocks_Days_Light_BLOCKS",   df_compblocksdayslight,   "Blocks"),
-        ("Comp_Blocks_Days_Dark_BLOCKS",    df_compblocksdaysdark,    "Blocks"),
-        ("Comp_Blocks_Cycles_CYCLES",       df_compblockscycles,      "Cycles"),
-        ("Comp_Blocks_Cycles_Light_CYCLES", df_compblockscycleslight, "Cycles"),
-        ("Comp_Blocks_Cycles_Dark_CYCLES",  df_compblockscyclesdark,  "Cycles"),
-        ("Comp_Blocks_Days_Light_TOTAL",    df_compblocksdayslight,   "Total"),
-        ("Comp_Blocks_Days_Dark_TOTAL",     df_compblocksdaysdark,    "Total"),
-        ("Comp_Blocks_Cycles_Light_TOTAL",  df_compblockscycleslight, "Total"),
-        ("Comp_Blocks_Cycles_Dark_TOTAL",   df_compblockscyclesdark,  "Total"),
+def get_info(inputs):
+
+    stopsig_info = [
+        # Stats    Restrict analysis of stat to complete cycles, days, ...
+        ("Cycles", []),
+        ("Days",   []),
+        ("Total",  []),
+        ("Cycles", ["Days"]),
+        ("Days",   ["Days"]),
+        ("Total",  ["Days"]),
+        ("Cycles", ["Cycles"]),
+        ("Cycles", ["Cycles", "Light"]),
+        ("Cycles", ["Cycles", "Dark"]),
+        ("Total",  ["Days",   "Light"]),
+        ("Total",  ["Days",   "Dark"]),
+        ("Total",  ["Cycles", "Light"]),
+        ("Total",  ["Cycles", "Dark"]),
     ]
-    dict1 = {val[0]: analyse_data(val[1], inputs, val[2], generate_results) for val in info}
+    closedecon_bandit_info = [
+        # Stats    Restrict analysis of stat to complete cycles, days, ...
+        ("Blocks", ["Blocks"]),
+        ("Cycles", ["Blocks"]),
+        ("Days",   ["Blocks"]),
+        ("Blocks", ["Blocks", "Days"]),
+        ("Cycles", ["Blocks", "Days"]),
+        ("Days",   ["Blocks", "Days"]),
+        ("Total",  ["Blocks", "Days"]),
+        ("Blocks", ["Blocks", "Days",   "Light"]),
+        ("Blocks", ["Blocks", "Days",   "Dark"]),
+        ("Cycles", ["Blocks", "Cycles"]),
+        ("Cycles", ["Blocks", "Cycles", "Light"]),
+        ("Cycles", ["Blocks", "Cycles", "Dark"]),
+        ("Total",  ["Blocks", "Days",   "Light"]),
+        ("Total",  ["Blocks", "Days",   "Dark"]),
+        ("Total",  ["Blocks", "Cycles", "Light"]),
+        ("Total",  ["Blocks", "Cycles", "Dark"]),
+    ]
+    info = {
+        "StopSig":        stopsig_info,
+        "ClosedEcon_PR1": closedecon_bandit_info,
+        "Bandit":         closedecon_bandit_info,
+    }
+    return(info[inputs["Session Type"]])
+
+def get_title_and_data_subset(df, stat, keys):
     
-    return(dict1)
+    # Write the title.
+    title = f"Comp_{'_'.join(keys)}_{stat.upper()}" if keys else stat.upper()
+
+    # Create a subset of the data for analysis.
+    conditions = {
+        "Blocks": df["Completed blocks"] == "Y",
+        "Cycles": df["Completed cycles"] == "Y",
+        "Days":   df["Completed days"]   == "Y",
+        "Light":  df["Light/Dark"]       == "Light",
+        "Dark":   df["Light/Dark"]       == "Dark",
+    }    
+    mask = pd.Series(True, index=df.index)
+    for k in keys:
+        mask &= conditions[k]
+    subset = df[mask]
+    
+    return(title, subset)
+
+def collect_data_subsets(df, inputs, generate_results):
+
+    info = get_info(inputs)
+    results = {}
+    
+    for stat, keys in info:
+        
+        # Get title and data subset.
+        title, subset = get_title_and_data_subset(df, stat, keys)
+
+        # Perform the analysis.
+        results[title] = analyse_data(subset, inputs, stat, generate_results)
+    
+    return(results)
 
 def analyse_FED_file(df, inputs):
     
@@ -705,14 +747,14 @@ def analyse_FED_file(df, inputs):
     sheets = add_additional_columns(sheets, inputs)
 
     if inputs["Session Type"] == "StopSig": 
-        # Collected paired events data and add latency information to df.
-        df, PE = collect_paired_events_data(df)
+        # Add block, light/dark cycle and day information as columns.
+        df = add_time_info(df, inputs)
         
-        # Calculate sums and averages of latencies.
-        stopsig = organise_paired_events_results(PE, inputs)
+        # Collect statistics grouped by blocks, cycles and days.
+        stopsig = collect_data_subsets(df, inputs, generate_results_stopsig)
         
         # Combine the overall results with the raw data and color code the sheet.
-        sheets["Paired events"] = combine_results_and_raw_data(df, stopsig, PE)
+        sheets["Paired events"] = combine_results_and_raw_data(df, inputs)
 
     if inputs["Session Type"] == "ClosedEcon_PR1":
         # Add block, light/dark cycle and day information as columns.

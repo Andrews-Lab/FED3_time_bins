@@ -113,35 +113,10 @@ def create_master_file(master, inputs):
     master = add_genotypes_treatments_to_master(master, inputs)
     master = add_time_columns_to_master(master, inputs)
     export_master_file(master, inputs)
-            
-def create_blank_singletime_master():
-    return([])
 
 def add_to_singletime_master(stopsig_master, stopsig):
     stopsig_master += [stopsig]
     return(stopsig_master)
-            
-def create_stopsig_master_file(stopsig_master, inputs):
-    
-    # Convert the list of dicts to a dataframe.
-    stopsig_master = pd.DataFrame(stopsig_master).T
-    stopsig_master.columns = stopsig_master.iloc[0]
-    stopsig_master = stopsig_master.drop("Filename")
-
-    # Add the genotypes and treatments to the columns and sort them by these headings.
-    def labels(filename, info):
-        return(gt_table.at[filename, info])
-    gt_table = inputs['Genotypes/treatments table']
-    headers = pd.Series(stopsig_master.columns, index=stopsig_master.columns)
-    for name in gt_table.columns:
-        table = headers.apply(labels, info=name).to_frame().T
-        table.index = [name]
-        stopsig_master = pd.concat([table, stopsig_master])
-    stopsig_master = stopsig_master.sort_values(by=list(gt_table.columns), axis=1)
-    
-    # Export the stopsig master file.
-    with pd.ExcelWriter(os.path.join(inputs['Export location'], 'StopSig_Master.xlsx')) as writer:
-        stopsig_master.to_excel(writer)
 
 def create_blank_multitime_master():
     return({})
@@ -196,6 +171,21 @@ def organise_table1(df_sheet, sheet, inputs):
     
     return(df_sheet)
 
+def reset_counting(series):
+    
+    # Redo the counting of a numeric series, so that monotonically increasing
+    # sections start at 1 and go up in intervals of 1.
+    # 
+    # Examples:
+    # 0,1,1,3,4,0,3,4 -> 1,2,2,3,4,1,2,3
+    # 7,6,5,4,3,2,1,0 -> 1,1,1,1,1,1,1,1
+    # 0,1,2,3,4,5,6,7 -> 1,2,3,4,5,6,7,8
+    # 
+    count_groups = (series.diff() < 0).cumsum()
+    renumbered = series.groupby(count_groups).rank(method="dense").astype(int)
+    
+    return(renumbered)
+
 def organise_table2(df_sheet, sheet, inputs):
     
     # Find the time data column that we will re-index.
@@ -209,12 +199,11 @@ def organise_table2(df_sheet, sheet, inputs):
     heading      = index_cols[data_type]
     num_heading  = heading[0] if type(heading)==list else heading
     
-    # Reset the counting so that blocks, cycles and days data is transformed from
-    # 0,1,1,3,4,0,3,4,... into 0,1,1,2,3,0,1,2,...
+    # Reset the counting so that blocks, cycles and days data don't have jumps
+    # as a result of excluded events (e.g. complete blocks only, light data only).
     df_sheet              = df_sheet.copy()
     df_sheet[num_heading] = pd.to_numeric(df_sheet[num_heading])
-    count_groups          = (df_sheet[num_heading].diff() < 0).cumsum()
-    df_sheet[num_heading] = df_sheet.groupby(count_groups)[num_heading].rank(method="dense").astype(int)
+    df_sheet[num_heading] = reset_counting(df_sheet[num_heading])
 
     # Make a new excel sheet for each data column.
     col_ind      = df_sheet.columns.get_loc("Length (mins)")
@@ -280,16 +269,29 @@ def export_multitime(master, inputs, name):
     # Export excel file.
     with pd.ExcelWriter(export_destination) as writer:
         for sheet in keep_sheets:
-            safe_name = sheet.replace("/","÷")
+            safe_name = sheet.replace("/","÷")[:31]
             master[sheet].to_excel(writer, sheet_name=safe_name, index=keep_index)
-      
-def create_multitime_master_file(master1, inputs):
+
+def get_sheet_and_file_names(inputs):
     
-    for sheet in master1.keys():
-        master1[sheet] = organise_table1(master1[sheet], sheet, inputs)
-    
-    # Sheets to appear in the Master_Bandit.xlsx or Master_ClosedEcon.xlsx file.
-    keep_sheets = [
+    # Get the sheet names and filenames for the master files based on session type.
+    keep_sheets_stopsig = [     
+        "CYCLES",              
+        "DAYS",
+        "TOTAL",
+        "Comp_Days_TOTAL",     
+        "Comp_Days_Light_TOTAL",
+        "Comp_Days_Dark_TOTAL",
+        "Comp_Cycles_Light_TOTAL",
+        "Comp_Cycles_Dark_TOTAL",
+    ]
+    keep_files_stopsig = [              
+        "Comp_Days_DAYS",
+        "Comp_Cycles_CYCLES",
+        "Comp_Cycles_Light_CYCLES",
+        "Comp_Cycles_Dark_CYCLES",
+    ]
+    keep_sheets_closedecon_bandit = [
         "Comp_Blocks_BLOCKS",              
         "Comp_Blocks_CYCLES",              
         "Comp_Blocks_DAYS",                       
@@ -299,10 +301,7 @@ def create_multitime_master_file(master1, inputs):
         "Comp_Blocks_Cycles_Light_TOTAL",
         "Comp_Blocks_Cycles_Dark_TOTAL",
     ]
-    export_multitime(master1, inputs, keep_sheets)
-    
-    # File to export as Master_Bandit_{file}.xlsx or Master_ClosedEcon_{file}.xlsx.
-    keep_files = [              
+    keep_files_closedecon_bandit = [              
         "Comp_Blocks_Days_DAYS",
         "Comp_Blocks_Days_BLOCKS",
         "Comp_Blocks_Days_Light_BLOCKS",
@@ -311,6 +310,25 @@ def create_multitime_master_file(master1, inputs):
         "Comp_Blocks_Cycles_Light_CYCLES",
         "Comp_Blocks_Cycles_Dark_CYCLES",
     ]
+    keep = {
+        "StopSig":        (keep_sheets_stopsig,           keep_files_stopsig),
+        "ClosedEcon_PR1": (keep_sheets_closedecon_bandit, keep_files_closedecon_bandit),
+        "Bandit":         (keep_sheets_closedecon_bandit, keep_files_closedecon_bandit),
+    }
+    return(keep[inputs["Session Type"]])
+
+def create_multitime_master_file(master1, inputs):
+    
+    # Get sheets and filenames to keep based on session type.
+    keep_sheets, keep_files = get_sheet_and_file_names(inputs)
+    
+    # Sheets to appear in the Master_Bandit.xlsx or Master_ClosedEcon.xlsx file.
+    for sheet in master1.keys():
+        master1[sheet] = organise_table1(master1[sheet], sheet, inputs)
+    
+    export_multitime(master1, inputs, keep_sheets)
+    
+    # File to export as Master_Bandit_{file}.xlsx or Master_ClosedEcon_{file}.xlsx.
     for file in keep_files:
         master2 = organise_table2(master1[file], file, inputs)
         export_multitime(master2, inputs, file)

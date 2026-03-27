@@ -3,9 +3,8 @@ from Create_GUI         import GUI
 from Preprocess_data    import find_import_files, preprocess_data
 from Create_time_bins   import analyse_FED_file
 from Create_master_file import (create_blank_master, add_columns_to_master, 
-    create_master_file, create_blank_singletime_master, add_to_singletime_master,
-    create_stopsig_master_file, create_blank_multitime_master, add_to_multitime_master, 
-    create_multitime_master_file, create_blank_plot_data_master,
+    create_master_file, add_to_singletime_master, create_blank_multitime_master, 
+    add_to_multitime_master, create_multitime_master_file, create_blank_plot_data_master,
     create_plot_data_master_file)
 
 # Run the GUI.
@@ -13,7 +12,7 @@ inputs = GUI()
     
 # Create master file templates.
 master            = create_blank_master()
-stopsig_master    = create_blank_singletime_master()
+stopsig_master    = create_blank_multitime_master()
 closedecon_master = create_blank_multitime_master()
 bandit_master     = create_blank_multitime_master()
 plot_data_master, inputs = create_blank_plot_data_master(inputs)
@@ -34,7 +33,7 @@ for inputs["Filename"] in tqdm(import_files, ncols=70):
         master = add_columns_to_master(master, sheets["Time bins"], inputs)
         
         if inputs["Session Type"] == "StopSig":
-            stopsig_master = add_to_singletime_master(stopsig_master, stopsig)
+            stopsig_master = add_to_multitime_master(stopsig_master, stopsig)
         
         elif inputs["Session Type"] == "ClosedEcon_PR1":
             closedecon_master = add_to_multitime_master(closedecon_master, closedecon)
@@ -48,7 +47,7 @@ if inputs['Find individual columns']:
     create_master_file(master, inputs)
     
     if inputs["Session Type"] == "StopSig":
-        create_stopsig_master_file(stopsig_master, inputs)
+        create_multitime_master_file(stopsig_master, inputs)
     
     elif inputs["Session Type"] == "ClosedEcon_PR1":
         create_multitime_master_file(closedecon_master, inputs)
