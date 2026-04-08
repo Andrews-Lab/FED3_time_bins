@@ -152,6 +152,22 @@ def per(val1, val2):
 
 def generate_results_stopsig1(df_short, results):
     
+    # Record event tallies.
+    extra_event_cols = [
+        ">Left_Regular_trial",
+        ">Left_Stop_trial",
+        "LeftinTimeOut",
+        "Right_no_left",
+        "RightDuringDispense",
+        "RightinTimeout"
+    ]
+    for event in extra_event_cols:
+        results[f"{event} count"] = (df_short["Event"] == event).sum()
+    
+    return(results)
+
+def generate_results_stopsig2(df_short, results):
+    
     # Record times when there are jumps between events.
     df_short = df_short.copy()
     df_short["Event no jump"]    = df_short.index.to_series().diff() == 1
@@ -310,7 +326,7 @@ def combine_results_and_raw_data(df, inputs):
     df_short = df.copy()
     results = {}
     results["Filename"] = inputs["Filename"]
-    results, masks, latencies = generate_results_stopsig1(df_short, results)
+    results, masks, latencies = generate_results_stopsig2(df_short, results)
     sheet = prepare_stopsig_sheet(df_short, results, masks, latencies)
 
     return(sheet)
@@ -522,7 +538,8 @@ def generate_results_closedecon(df_short, results, name):
 def generate_results_stopsig(df_short, results, name):
     
     results = generate_results_closedecon(df_short, results, name)
-    results, _, _, = generate_results_stopsig1(df_short, results)
+    results = generate_results_stopsig1(df_short, results)
+    results, _, _, = generate_results_stopsig2(df_short, results)
     
     return(results)
 
