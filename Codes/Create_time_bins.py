@@ -247,6 +247,7 @@ def generate_results_stopsig2(df_short, results):
     stop_LR_count     = stop_LR_L.sum()
     total_stop        = stop_LNP_count + stop_LR_count
     total_events      = total_regular + total_stop
+    pellet_count      = pellet.sum()
 
     # Record the results into a dictionary.
     results["Regular LRP count"]                 = regular_LRP_count
@@ -274,6 +275,9 @@ def generate_results_stopsig2(df_short, results):
     results["Stop LR/total events (%)"]          = per(stop_LR_count, total_events)
     results["Stop events/total events (%)"]      = per(total_stop, total_events)
     results["Total events"]                      = total_events
+    results["Pellet count"]                      = pellet_count
+    results["LRP/total pellets (%)"]             = per(regular_LRP_count, pellet_count)
+    results["LNP/total pellets (%)"]             = per(stop_LNP_count, pellet_count)
     
     return(results, masks, latencies) 
     

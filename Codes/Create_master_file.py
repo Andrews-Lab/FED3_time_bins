@@ -150,7 +150,20 @@ def organise_table1(df_sheet, sheet, inputs):
     # Rotate the table in contrast to previous master files.
     df_sheet = df_sheet.T
     df_sheet.insert(3,"Filename",df_sheet.index)
-    
+
+    # Add stats for StopSig that are cumulative across the blocks, cycles, days, ... 
+    if inputs["Session Type"] == "StopSig":
+        
+        cols = ["Regular LRP count", "Stop LNP count", "Pellet count"]
+        df_sheet[cols] = df_sheet[cols].apply(pd.to_numeric, errors="raise")
+
+        sum_LRP     = df_sheet.groupby(df_sheet.index)["Regular LRP count"].cumsum()
+        sum_LNP     = df_sheet.groupby(df_sheet.index)["Stop LNP count"].cumsum()
+        sum_pellets = df_sheet.groupby(df_sheet.index)["Pellet count"].cumsum()
+
+        df_sheet["Sum LRP/total pellets (%)"] = (sum_LRP / sum_pellets) * 100
+        df_sheet["Sum LNP/total pellets (%)"] = (sum_LNP / sum_pellets) * 100
+
     # List the columns to drop and rename.
     drop_cols = {
         "BLOCKS": ["Completed cycles", "Completed days", "Cycles"],
