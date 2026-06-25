@@ -221,7 +221,8 @@ def organise_table2(df_sheet, sheet, inputs):
     # Make a new excel sheet for each data column.
     col_ind      = df_sheet.columns.get_loc("Length (mins)")
     list_heading = [heading] if type(heading)==str else heading
-    data_cols    = df_sheet.columns[col_ind:].tolist() + list_heading
+    blocks_col   = ["Number of blocks"] if "Number of blocks" in df_sheet.columns else []
+    data_cols    = blocks_col + df_sheet.columns[col_ind:].tolist() + list_heading
     gt_table     = inputs['Genotypes/treatments table']
     id_info      = [gt_table.index.name] + gt_table.columns.tolist()
     
