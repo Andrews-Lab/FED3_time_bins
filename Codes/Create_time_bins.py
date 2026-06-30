@@ -723,6 +723,7 @@ def get_info(inputs):
     ]
     info = {
         "StopSig":        stopsig_info,
+        "LeftRight":      stopsig_info,
         "ClosedEcon_PR1": closedecon_bandit_info,
         "Bandit":         closedecon_bandit_info,
     }
@@ -767,6 +768,7 @@ def analyse_FED_file(df, inputs):
     
     sheets     = {}
     stopsig    = {}
+    leftright  = {}
     closedecon = {}
     bandit     = {}
     plot_data  = {}
@@ -794,6 +796,16 @@ def analyse_FED_file(df, inputs):
         
         # Combine the overall results with the raw data and color code the sheet.
         sheets["Paired events"] = combine_results_and_raw_data(df, inputs)
+    
+    if inputs["Session Type"] == "LeftRight": 
+        # Add block, light/dark cycle and day information as columns.
+        df = add_time_info(df, inputs)
+        
+        # Collect statistics grouped by blocks, cycles and days.
+        leftright = collect_data_subsets(df, inputs, generate_results_stopsig)
+        
+        # Combine the overall results with the raw data and color code the sheet.
+        sheets["Paired events"] = combine_results_and_raw_data(df, inputs)
 
     if inputs["Session Type"] == "ClosedEcon_PR1":
         # Add block, light/dark cycle and day information as columns.
@@ -814,4 +826,4 @@ def analyse_FED_file(df, inputs):
     # Export the data.
     export_data(inputs, sheets)
         
-    return(sheets, stopsig, closedecon, bandit, plot_data)
+    return(sheets, stopsig, leftright, closedecon, bandit, plot_data)
