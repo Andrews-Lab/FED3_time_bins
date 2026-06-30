@@ -13,6 +13,7 @@ inputs = GUI()
 # Create master file templates.
 master            = create_blank_master()
 stopsig_master    = create_blank_multitime_master()
+leftright_master  = create_blank_multitime_master()
 closedecon_master = create_blank_multitime_master()
 bandit_master     = create_blank_multitime_master()
 plot_data_master, inputs = create_blank_plot_data_master(inputs)
@@ -26,7 +27,7 @@ for inputs["Filename"] in tqdm(import_files, ncols=70):
     df, inputs = preprocess_data(inputs)
     
     # Analyse the individual FED file.
-    sheets, stopsig, closedecon, bandit, plot_data = analyse_FED_file(df, inputs)
+    sheets, stopsig, leftright, closedecon, bandit, plot_data = analyse_FED_file(df, inputs)
         
     # Add the columns to the master file.
     if inputs['Find individual columns']:
@@ -34,6 +35,9 @@ for inputs["Filename"] in tqdm(import_files, ncols=70):
         
         if inputs["Session Type"] == "StopSig":
             stopsig_master = add_to_multitime_master(stopsig_master, stopsig)
+        
+        elif inputs["Session Type"] == "LeftRight":
+            leftright_master = add_to_multitime_master(leftright_master, leftright)
         
         elif inputs["Session Type"] == "ClosedEcon_PR1":
             closedecon_master = add_to_multitime_master(closedecon_master, closedecon)
@@ -48,6 +52,9 @@ if inputs['Find individual columns']:
     
     if inputs["Session Type"] == "StopSig":
         create_multitime_master_file(stopsig_master, inputs)
+
+    elif inputs["Session Type"] == "LeftRight":
+        create_multitime_master_file(leftright_master, inputs)
     
     elif inputs["Session Type"] == "ClosedEcon_PR1":
         create_multitime_master_file(closedecon_master, inputs)
