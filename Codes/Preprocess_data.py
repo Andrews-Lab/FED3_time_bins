@@ -249,8 +249,8 @@ def preprocess_data(inputs):
     # Remove the data before the start time and after the end time.
     df = remove_data_outside_window(df, inputs)
     
-    if inputs["Session Type"] == "StopSig":
-        # Add additional columns based on the events column for the stopsig task.
+    if inputs["Session Type"] in ["StopSig", "LeftRight"]:
+        # Add additional columns based on the events column for the stopsig and leftright tasks.
         df = add_additional_columns_stopsig(df)
     
     if inputs["Session Type"] == "ClosedEcon_PR1":

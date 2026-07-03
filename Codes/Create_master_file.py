@@ -326,6 +326,7 @@ def get_sheet_and_file_names(inputs):
     ]
     keep = {
         "StopSig":        (keep_sheets_stopsig,           keep_files_stopsig),
+        "LeftRight":      (keep_sheets_stopsig,           keep_files_stopsig),
         "ClosedEcon_PR1": (keep_sheets_closedecon_bandit, keep_files_closedecon_bandit),
         "Bandit":         (keep_sheets_closedecon_bandit, keep_files_closedecon_bandit),
     }
