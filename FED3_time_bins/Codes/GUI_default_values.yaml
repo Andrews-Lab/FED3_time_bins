@@ -1,0 +1,24 @@
+Import location: ''
+Export location: ''
+Start time type: Use first timestamp
+Start time: 2/07/2022 19:31:12
+End time type: Use last timestamp
+End time: 2/07/2022 21:48:57
+Time bin (mins): 1.0
+Find individual columns: true
+Create sum masters: false
+Create Classic metric sheets: true
+Classic duration (mins): ''
+Classic active poke fallback: Auto
+Create plots: true
+Plot preset: Full
+Plot source: Both
+Plot primary group: Genotype
+Plot secondary group: Sex
+Plot individual lines: false
+Shade dark phases: true
+Use custom plot colors: true
+Use settings file: false
+Settings import location: ''
+Light cycle start: '21:00:00'
+Light cycle end: '9:00:00'
