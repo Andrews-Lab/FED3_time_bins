@@ -16,3 +16,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+
+# Local Trialbins test data and generated outputs
+FED3_trial_bins/Bandit_EXTRAS.xlsx
+FED3_trial_bins/Bandit_Metadata.xlsx
+FED3_trial_bins/bandit_dummy_raw_csv.CSV
+FED3_trial_bins/bandit_manual_validation.xlsx
