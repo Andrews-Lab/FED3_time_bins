@@ -186,6 +186,7 @@ Additional task-specific instructions:
 - [Stop Signal guide](FED3_trial_bins/StopSig_README.txt)
 - [Bandit guide](FED3_trial_bins/Bandit_README.txt)
 <br>
+
 ### Acknowledgements
 
 **Author:** <br>
