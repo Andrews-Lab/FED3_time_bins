@@ -1,9 +1,12 @@
 from Preprocess_data import import_data, clean_data, correct_session_type_columns
+from Create_concatenator import run_concatenator_gui
+from Create_classic_metrics import supports_classic_enhancements
 import pandas as pd
 import os
 import PySimpleGUI as sg
 import sys
 import yaml
+from tkinter import colorchooser
 
 def import_yaml_file():
     
@@ -18,6 +21,11 @@ def import_yaml_file():
 def str_to_bool(value):
     dict1 = {'True':True, 'False':False}
     return(dict1[value])
+
+def clean_metadata_value(value):
+    if pd.isna(value):
+        return ''
+    return ' '.join(str(value).split())
 
 def basic_options(default):
     
@@ -53,9 +61,10 @@ def basic_options(default):
                      sg.Combo(["True", "False"],
                               default_value=str(default['Find individual columns']),
                               key="Find_Ind_Cols",enable_events=True)],
-        [sg.T("")], [sg.Button("Submit")]
+        [sg.T("")], [sg.Button("Submit"), sg.Push(), sg.Button("Concatenate files")]
              ]
-    window = sg.Window('Options for analysis', layout, finalize=True)
+    # Resizable window (handy for long paths)
+    window = sg.Window('Options for analysis', layout, finalize=True, resizable=True)
     
     # Intialise the prompt visibility.
     if default["Start time type"] in ["Use first timestamp","Use initiation poke"]:
@@ -81,6 +90,8 @@ def basic_options(default):
             window.Element("End_Time").Update(visible=False)
         if values["End_Time_Type"] == 'Use custom time':
             window.Element("End_Time").Update(visible=True)
+        if event == "Concatenate files":
+            run_concatenator_gui()
         # If submit is pressed, record the entries in the GUI.
         if event == "Submit":
             inputs['Import location']         = values["Import"]
@@ -110,6 +121,166 @@ def check_session_type(inputs):
     
     return(inputs["Session Type"])
 
+def choose_classic_metrics(inputs, default):
+
+    sg.theme("DarkTeal2")
+
+    # Translate values saved by the earlier three-choice version of this option so existing YAML settings remain compatible.
+    saved_active_mode = default.get(
+        "Classic active poke fallback",
+        "Auto",
+    )
+    active_mode = {
+        "Left": "Left fallback",
+        "Right": "Right fallback",
+    }.get(saved_active_mode, saved_active_mode)
+
+    layout = [
+        [sg.T("")],
+        [
+            sg.Text("Create additional ClassicFED metric sheets?"),
+            sg.Combo(
+                ["True", "False"],
+                default_value=str(
+                    default.get(
+                        "Create Classic metric sheets",
+                        False,
+                    )
+                ),
+                key="Create Classic metric sheets",
+                readonly=True,
+            ),
+        ],
+        [sg.T("")],
+        [
+            sg.Text(
+                "Target duration in minutes "
+                "(leave blank to keep original duration)"
+            ),
+            sg.Input(
+                default_text=default.get(
+                    "Classic duration (mins)",
+                    "",
+                ),
+                key="Classic duration (mins)",
+                size=(10, 1),
+            ),
+        ],
+        [sg.T("")],
+        [
+            sg.Text("Active poke handling"),
+            sg.Combo(
+                [
+                    "Auto",
+                    "Left fallback",
+                    "Right fallback",
+                    "Skip active-side metrics",
+                ],
+                default_value=active_mode,
+                key="Classic active poke fallback",
+                readonly=True,
+            ),
+        ],
+        [sg.T("")],
+        [sg.Button("Submit")],
+    ]
+
+    window = sg.Window(
+        "ClassicFED options",
+        layout,
+    )
+
+    while True:
+        event, values = window.read()
+
+        if event == sg.WIN_CLOSED or event == "Exit":
+            window.close()
+            sys.exit()
+
+        if event == "Submit":
+            create_metrics = str_to_bool(
+                values["Create Classic metric sheets"]
+            )
+
+            duration_text = str(
+                values["Classic duration (mins)"]
+            ).strip()
+
+            if duration_text == "":
+                duration = ""
+            else:
+                try:
+                    duration = float(duration_text)
+
+                    if duration <= 0:
+                        raise ValueError
+
+                except ValueError:
+                    sg.popup_error(
+                        "Target duration must be a positive "
+                        "number or left blank."
+                    )
+                    continue
+
+            inputs["Create Classic metric sheets"] = (
+                create_metrics
+            )
+
+            inputs["Classic duration (mins)"] = duration
+
+            inputs["Classic active poke fallback"] = values[
+                "Classic active poke fallback"
+            ]
+
+            window.close()
+            break
+
+    return inputs
+
+
+def choose_to_create_sum_masters(inputs, default):
+
+    sg.theme("DarkTeal2")
+    layout = [
+        [sg.T("")],
+        [
+            sg.Text("Create summed master Excel files?"),
+            sg.Combo(
+                ["True", "False"],
+                default_value=str(
+                    default.get("Create sum masters", False)
+                ),
+                key="Create sum masters",
+                readonly=True,
+                enable_events=True,
+            ),
+        ],
+        [sg.T("")],
+        [sg.Button("Submit")],
+    ]
+
+    window = sg.Window(
+        "Choose summed master outputs",
+        layout,
+    )
+
+    while True:
+        event, values = window.read()
+
+        if event == sg.WIN_CLOSED or event == "Exit":
+            window.close()
+            sys.exit()
+
+        elif event == "Submit":
+            inputs["Create sum masters"] = str_to_bool(
+                values["Create sum masters"]
+            )
+            window.close()
+            break
+
+    return inputs
+
+
 def choose_light_dark_cycle(inputs, default):
     
     sg.theme("DarkTeal2")
@@ -135,6 +306,110 @@ def choose_light_dark_cycle(inputs, default):
             break
     
     return(inputs)    
+
+def choose_plot_options(inputs, default):
+    metadata_columns = list(inputs["Genotypes/treatments table"].columns)
+    if not metadata_columns:
+        inputs["Create plots"] = False
+        return inputs
+
+    default_primary = default.get("Plot primary group", metadata_columns[0])
+    if default_primary not in metadata_columns:
+        default_primary = metadata_columns[0]
+
+    secondary_choices = ["None"] + metadata_columns
+    default_secondary = default.get("Plot secondary group", "None")
+    if default_secondary not in secondary_choices:
+        default_secondary = "None"
+
+    sg.theme("DarkTeal2")
+    layout = [
+        [sg.T("")],
+        [sg.Text("Create plots?"),
+         sg.Combo(["True", "False"],
+                  default_value=str(default.get("Create plots", False)),
+                  key="Create plots", readonly=True)],
+        [sg.Text("Plot preset"),
+         sg.Combo(["Basic", "Full"],
+                  default_value=default.get("Plot preset", "Basic"),
+                  key="Plot preset", readonly=True)],
+        [sg.Text("Plot source"),
+         sg.Combo(["Normal", "Summed", "Both"],
+                  default_value=default.get("Plot source", "Normal"),
+                  key="Plot source", readonly=True)],
+        [sg.T("")],
+        [sg.Text("Primary grouping"),
+         sg.Combo(metadata_columns, default_value=default_primary,
+                  key="Plot primary group", readonly=True)],
+        [sg.Text("Secondary grouping"),
+         sg.Combo(secondary_choices, default_value=default_secondary,
+                  key="Plot secondary group", readonly=True)],
+        [sg.T("")],
+        [sg.Text("Show individual animal lines?"),
+         sg.Combo(["True", "False"],
+                  default_value=str(default.get("Plot individual lines", False)),
+                  key="Plot individual lines", readonly=True)],
+        [sg.Text("Shade Dark phases?"),
+         sg.Combo(["True", "False"],
+                  default_value=str(default.get("Shade dark phases", True)),
+                  key="Shade dark phases", readonly=True)],
+        [sg.Text("Use custom plot colours?"),
+         sg.Combo(["True", "False"],
+                  default_value=str(default.get("Use custom plot colors", False)),
+                  key="Use custom plot colors", readonly=True)],
+        [sg.T("")],
+        [sg.Button("Submit")],
+    ]
+
+    window = sg.Window("Plot options", layout)
+    while True:
+        event, values = window.read()
+        if event == sg.WIN_CLOSED or event == "Exit":
+            window.close()
+            sys.exit()
+        if event == "Submit":
+            inputs["Create plots"] = str_to_bool(values["Create plots"])
+            inputs["Plot preset"] = values["Plot preset"]
+            inputs["Plot source"] = values["Plot source"]
+            inputs["Plot primary group"] = values["Plot primary group"]
+            inputs["Plot secondary group"] = values["Plot secondary group"]
+            inputs["Plot individual lines"] = str_to_bool(
+                values["Plot individual lines"]
+            )
+            inputs["Shade dark phases"] = str_to_bool(
+                values["Shade dark phases"]
+            )
+            inputs["Use custom plot colors"] = str_to_bool(
+                values["Use custom plot colors"]
+            )
+            window.close()
+            break
+
+    inputs["Plot color maps"] = {}
+    if inputs["Create plots"] and inputs["Use custom plot colors"]:
+        metadata = inputs["Genotypes/treatments table"]
+        color_columns = [inputs["Plot primary group"]]
+        secondary = inputs["Plot secondary group"]
+        if secondary != "None" and secondary not in color_columns:
+            color_columns.append(secondary)
+
+        for column in color_columns:
+            color_map = {}
+            unique_values = sorted({
+                clean_metadata_value(value)
+                for value in metadata[column].dropna()
+                if clean_metadata_value(value) != ''
+            })
+            for value in unique_values:
+                color = colorchooser.askcolor(
+                    title=f"Choose colour for {column}: {value}"
+                )[1]
+                if color is not None:
+                    color_map[str(value)] = color
+            inputs["Plot color maps"][column] = color_map
+
+    return inputs
+
 
 def choose_to_import_settings_file(inputs, default):
     
@@ -185,7 +460,10 @@ def choose_settings_file_location(inputs, default):
 def import_settings_file(inputs):
     
     gt_table = pd.read_excel(inputs['Settings import location'], index_col=0)
-    gt_table = gt_table.fillna('')
+    gt_table = gt_table.applymap(clean_metadata_value)
+    gt_table.columns = [clean_metadata_value(column) for column in gt_table.columns]
+    gt_table.index = gt_table.index.map(clean_metadata_value)
+    gt_table.index.name = 'Filename'
     inputs['Genotypes/treatments table'] = gt_table
     
     return(inputs)
@@ -198,35 +476,56 @@ def create_settings_file(inputs):
     sg.theme("DarkTeal2")
     size1 = (30,1)
     size2 = (20,1)
-    layout = [[sg.T("")], [sg.Text('Filename', size=size1), 
-                           sg.Input(default_text="Genotype",  key="Name1", size=size2),
-                           sg.Input(default_text="Treatment", key="Name2", size=size2),
-                           sg.Input(default_text="Mouse ID",  key="Name3", size=size2)]]
+
+    # Header row with EDITABLE titles (as before)
+    rows = [[sg.T("")],
+            [sg.Text('Filename', size=size1),
+             sg.Input(default_text="Genotype",  key="Name1", size=size2, expand_x=True),
+             sg.Input(default_text="Treatment", key="Name2", size=size2, expand_x=True),
+             sg.Input(default_text="Mouse ID",  key="Name3", size=size2, expand_x=True)]]
+
+    # One row per file
     for filename in import_files:
-        layout += [[sg.Text(filename, size=size1), 
-                    sg.Input(size=size2, key=filename+'_Name1'),
-                    sg.Input(size=size2, key=filename+'_Name2'),
-                    sg.Input(size=size2, key=filename+'_Name3')]]
-    layout += [[sg.T("")], [sg.Button("Submit")]]
-    window = sg.Window('Fill in the genotypes/treatments', layout)
+        rows += [[sg.Text(filename, size=size1, tooltip=filename),
+                  sg.Input(size=size2, key=filename+'_Name1', expand_x=True),
+                  sg.Input(size=size2, key=filename+'_Name2', expand_x=True),
+                  sg.Input(size=size2, key=filename+'_Name3', expand_x=True)]]
+
+    # Scrollable column so huge file lists are usable
+    scrollable_col = sg.Column(rows, scrollable=True, vertical_scroll_only=True,
+                               size=(900, 600), expand_x=True, expand_y=True)
+    layout = [[scrollable_col], [sg.Push(), sg.Button("Submit", bind_return_key=True)]]
+
+    # Resizable + draggable window
+    window = sg.Window('Fill in the genotypes/treatments', layout,resizable=True,
+                       finalize=True, grab_anywhere=True)
+
     while True:
         event, values = window.read()
         if event == sg.WIN_CLOSED or event=="Exit":
             window.close()
             sys.exit()
         elif event == "Submit":
+            # READ the customizable column titles from the header inputs
             name1 = values["Name1"]
             name2 = values["Name2"]
             name3 = values["Name3"]
+
             gt_table = pd.DataFrame(columns=[name1,name2,name3],
                                     index=import_files)
             gt_table.index.name = 'Filename'
+
             for filename in import_files:
-                gt_table.at[filename,name1] = values[filename+'_Name1']
-                gt_table.at[filename,name2] = values[filename+'_Name2']
-                gt_table.at[filename,name3] = values[filename+'_Name3']
+                gt_table.at[filename,name1] = values.get(filename+'_Name1', '')
+                gt_table.at[filename,name2] = values.get(filename+'_Name2', '')
+                gt_table.at[filename,name3] = values.get(filename+'_Name3', '')
             window.close()
             break    
+
+    gt_table = gt_table.applymap(clean_metadata_value)
+    gt_table.columns = [clean_metadata_value(column) for column in gt_table.columns]
+    gt_table.index = gt_table.index.map(clean_metadata_value)
+    gt_table.index.name = 'Filename'
     inputs['Genotypes/treatments table'] = gt_table
     
     return(inputs)
@@ -246,10 +545,32 @@ def export_settings_file(inputs):
 def export_yaml_file(inputs, default):
     
     export = {}
-    entries = ['Import location','Export location','Start time type','Start time',
-               'End time type','End time','Time bin (mins)','Find individual columns',
-               'Use settings file','Settings import location','Light cycle start',
-               'Light cycle end']
+    entries = [
+        'Import location',
+        'Export location',
+        'Start time type',
+        'Start time',
+        'End time type',
+        'End time',
+        'Time bin (mins)',
+        'Find individual columns',
+        'Create sum masters',
+        'Create Classic metric sheets',
+        'Classic duration (mins)',
+        'Classic active poke fallback',
+        'Create plots',
+        'Plot preset',
+        'Plot source',
+        'Plot primary group',
+        'Plot secondary group',
+        'Plot individual lines',
+        'Shade dark phases',
+        'Use custom plot colors',
+        'Use settings file',
+        'Settings import location',
+        'Light cycle start',
+        'Light cycle end',
+    ]
     for entry in entries:
         if entry in inputs.keys():
             export[entry] = inputs[entry]
@@ -276,10 +597,44 @@ def GUI(skip=False):
 
     # Choose the basic information for FED analysis.
     inputs = basic_options(default)
-    
-    # If the light dark cycle information is needed, ask for this data.
-    if check_session_type(inputs) in ['ClosedEcon_PR1', "Bandit"]:
-        inputs = choose_light_dark_cycle(inputs, default)
+
+    # Inspect the first file to determine the analysis pathway.
+    session_type = check_session_type(inputs)
+
+    # Ordinary ClassicFED-style sessions can receive the optional
+    # Classic metrics.
+    if supports_classic_enhancements(session_type):
+        inputs = choose_classic_metrics(
+            inputs,
+            default,
+        )
+
+        # The summed specialised masters are not relevant here.
+        inputs["Create sum masters"] = False
+
+    # Specialised long-session types keep their existing options.
+    else:
+        inputs["Create Classic metric sheets"] = False
+        inputs["Classic duration (mins)"] = ""
+        inputs["Classic active poke fallback"] = "Auto"
+
+        if session_type in [
+            "ClosedEcon_PR1",
+            "Bandit",
+            "StopSig",
+            "LeftRight",
+        ]:
+            inputs = choose_to_create_sum_masters(
+                inputs,
+                default,
+            )
+
+            inputs = choose_light_dark_cycle(
+                inputs,
+                default,
+            )
+        else:
+            inputs["Create sum masters"] = False
     
     # If find individual columns is true, ask whether to import an existing excle file.
     if inputs['Find individual columns']:
@@ -294,9 +649,14 @@ def GUI(skip=False):
         if inputs['Use settings file'] == False:
             inputs = create_settings_file(inputs)
             export_settings_file(inputs)
+
+        # Plot grouping choices depend on the metadata headers, so ask only after the settings table has been imported or created.
+        inputs = choose_plot_options(inputs, default)
+    else:
+        inputs["Create plots"] = False
     
-    # Export the inputs into a yaml file containing the default GUI values for 
-    # the next GUI run.
+    # Export the inputs into a yaml file containing the default GUI values for the next GUI run.
     export_yaml_file(inputs, default)
             
     return(inputs)
+
