@@ -123,6 +123,57 @@ python FED3_Analyzer.py
 
 Select **Time Bins** or **Trial Bins** from the main window and follow the prompts for the selected analysis.
 
+### Troubleshooting
+
+FED3 Analyzer requires **PySimpleGUI 4.60.5**. This version is pinned because the application was developed and tested against the PySimpleGUI 4.x API. PySimpleGUI 5.x introduced licensing requirements and compatibility changes, while later major versions have not yet been validated with FED3 Analyzer.
+
+Install the supported version:
+
+```bash
+conda install -c conda-forge pysimplegui=4.60.5
+```
+
+Verify the installed version:
+
+```bash
+python -c "import PySimpleGUI as sg; print(sg.version)"
+```
+
+The output should show:
+
+```text
+4.60.5
+```
+
+If errors indicate that another dependency is missing, update the environment from the supplied dependency file:
+
+```bash
+conda activate FTB
+conda env update -f Dependencies.yaml --prune
+```
+
+For example, PyYAML can also be installed manually:
+
+```bash
+conda install -c conda-forge pyyaml
+```
+
+If the environment becomes corrupted, remove and recreate it:
+
+```bash
+conda deactivate
+conda env remove -n FTB
+conda env create -f Dependencies.yaml
+conda activate FTB
+```
+
+Verify PySimpleGUI again before launching FED3 Analyzer:
+
+```bash
+python -c "import PySimpleGUI as sg; print(sg.version)"
+python FED3_Analyzer.py
+```
+
 ### Guides
 
 View the [FED3 Analyzer Quick Start Guide](FED3_Analyzer_Quick_Start_Guide.pdf) for a visual overview of the available workflows.
@@ -134,9 +185,7 @@ Additional task-specific instructions:
 - [Closed Economy PR1 guide](FED3_trial_bins/ClosedEconPR1_README.txt)
 - [Stop Signal guide](FED3_trial_bins/StopSig_README.txt)
 - [Bandit guide](FED3_trial_bins/Bandit_README.txt)
-
 <br>
-
 ### Acknowledgements
 
 **Author:** <br>
