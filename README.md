@@ -71,7 +71,7 @@ Open Anaconda Prompt on Windows or Terminal on macOS. <br>
 Clone this repository:
 
 ```bash
-git clone https://github.com/Andrews-Lab/FED3_time_bins.git FED3_Analyzer
+git clone https://github.com/Andrews-Lab/FED3_Analyzer.git
 ```
 
 If Git is unavailable, install it and verify the installation:
