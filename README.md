@@ -189,7 +189,7 @@ Additional task-specific instructions:
 
 ### Acknowledgements
 
-**Author:** <br>
+**Authors:** <br>
 [Taaseen Rahman](https://github.com/Taaseen-Rahman), [Harry Dempsey](https://github.com/H-Dempsey) <br>
 
 **Credits:** <br>
