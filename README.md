@@ -190,10 +190,10 @@ Additional task-specific instructions:
 ### Acknowledgements
 
 **Author:** <br>
-[Harry Dempsey](https://github.com/H-Dempsey) (Andrews Lab and Foldi Lab) <br>
+[Taaseen Rahman](https://github.com/Taaseen-Rahman), [Harry Dempsey](https://github.com/H-Dempsey) <br>
 
 **Credits:** <br>
-Zane Andrews, Wang Lok So, Lex Kravitz, Taaseen Rahman <br>
+Zane Andrews, Wang Lok So, Lex Kravitz <br>
 
 **About the labs:** <br>
 The [Andrews Lab](https://www.monash.edu/discovery-institute/andrews-lab) investigates how the brain senses and responds to hunger. <br>
